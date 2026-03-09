@@ -1,5 +1,192 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
-<head><meta charset="UTF-8"><title>شعراء القطيف</title>
-<style>body{background:#1a1a2e;color:#c9a84c;font-family:Arial;text-align:center;padding:50px}h1{font-size:3em}</style>
-</head><body><h1>شعراء القطيف</h1><p>مرحباً بكم في موقع شعراء القطيف</p></body></html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Shuaraa AlQatif</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#1a1a2e;--bg2:#16213e;--bg3:#0f3460;--gold:#c9a84c;--green:#2d6a4f;--text:#f0e6d3;--text2:#b8a89a;--card:#1e2747;--r:12px}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;direction:rtl}
+a{color:var(--gold);text-decoration:none}
+.ctr{max-width:1200px;margin:0 auto;padding:0 20px}
+nav{background:var(--bg2);border-bottom:2px solid var(--gold);padding:12px 0;position:sticky;top:0;z-index:100}
+nav .ctr{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.logo{font-size:1.6rem;font-weight:900;color:var(--gold);cursor:pointer}
+.nv{display:flex;gap:6px;flex-wrap:wrap}
+.nv button{background:none;border:1px solid transparent;color:var(--text2);padding:8px 16px;border-radius:20px;cursor:pointer;font-family:inherit;font-size:.9rem;transition:.3s}
+.nv button:hover,.nv button.on{color:var(--gold);border-color:var(--gold);background:rgba(201,168,76,.1)}
+.hero{text-align:center;padding:40px 20px;background:linear-gradient(135deg,var(--bg2),var(--bg3));border-radius:var(--r);margin:20px 0}
+.hero h1{color:var(--gold);font-size:2.2rem;margin-bottom:8px}
+.hero p{color:var(--text2)}
+.sbar{display:flex;justify-content:center;gap:40px;padding:20px;background:var(--bg2);border-radius:var(--r);margin:20px 0;flex-wrap:wrap}
+.si{text-align:center}.sn{font-size:2rem;font-weight:900;color:var(--gold)}.sl{font-size:.85rem;color:var(--text2)}
+.sb{max-width:600px;margin:20px auto}
+.sb input{width:100%;padding:14px 20px;border-radius:30px;border:2px solid var(--bg3);background:var(--card);color:var(--text);font-family:inherit;font-size:1rem;outline:none}
+.sb input:focus{border-color:var(--gold)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px;padding:20px 0}
+.card{background:var(--card);border-radius:var(--r);padding:24px;border:1px solid rgba(201,168,76,.15);transition:.3s;cursor:pointer}
+.card:hover{transform:translateY(-4px);border-color:var(--gold);box-shadow:0 8px 30px rgba(201,168,76,.15)}
+.av{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--green));display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:2rem;font-weight:900;color:var(--bg)}
+.card h3{text-align:center;color:var(--gold);font-size:1.1rem;margin-bottom:4px}
+.card .rg{text-align:center;color:var(--text2);font-size:.85rem;margin-bottom:8px}
+.card .ct{text-align:center}.tag{display:inline-block;padding:3px 12px;border-radius:12px;font-size:.78rem;background:rgba(45,106,79,.2);color:#5cb88a}
+.ph{text-align:center;padding:40px 20px;background:linear-gradient(135deg,var(--bg2),var(--bg3));border-radius:var(--r);margin:20px 0}
+.ph .av{width:120px;height:120px;font-size:3rem;border:4px solid var(--gold);margin-bottom:20px}
+.ph h1{color:var(--gold);font-size:1.8rem;margin-bottom:8px}
+.ph .mt{color:var(--text2);font-size:.9rem}
+.bio{background:var(--card);padding:24px;border-radius:var(--r);margin:20px 0;line-height:1.8;border-right:4px solid var(--gold)}
+.pi{background:var(--card);border-radius:var(--r);margin:12px 0;border:1px solid rgba(201,168,76,.1);overflow:hidden}
+.pih{padding:16px 20px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:.3s;flex-wrap:wrap;gap:8px}
+.pih:hover{background:rgba(201,168,76,.05)}
+.pih h3{color:var(--gold);font-size:1rem}
+.bds{display:flex;gap:6px;flex-wrap:wrap}
+.bd{padding:3px 10px;border-radius:12px;font-size:.75rem}
+.bd-t{background:rgba(45,106,79,.2);color:#5cb88a}
+.bd-m{background:rgba(201,168,76,.15);color:var(--gold)}
+.bd-r{background:rgba(15,52,96,.5);color:#7eb8da}
+.pic{padding:0 20px 20px;white-space:pre-line;line-height:2;color:var(--text2);display:none;border-top:1px solid rgba(201,168,76,.1);padding-top:16px;font-size:1.05rem}
+.pic.show{display:block}
+.flt{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0;justify-content:center}
+.flt select{padding:10px 16px;border-radius:20px;border:1px solid var(--bg3);background:var(--card);color:var(--text);font-family:inherit;font-size:.9rem;outline:none;cursor:pointer}
+.flt select:focus{border-color:var(--gold)}
+.rc{text-align:center;color:var(--text2);margin:10px 0}
+.an{display:flex;gap:8px;margin:20px 0;flex-wrap:wrap;justify-content:center}
+.an button{padding:10px 20px;border-radius:20px;border:1px solid var(--bg3);background:var(--card);color:var(--text2);cursor:pointer;font-family:inherit;transition:.3s}
+.an button:hover,.an button.on{background:var(--gold);color:var(--bg);border-color:var(--gold)}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th{background:var(--bg3);color:var(--gold);padding:12px;text-align:right;font-size:.85rem}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.05);font-size:.85rem}
+tr:hover td{background:rgba(201,168,76,.03)}
+.btn{padding:6px 14px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:.8rem;transition:.3s;margin:0 2px}
+.bg{background:var(--gold);color:var(--bg)}.bgr{background:var(--green);color:#fff}.br{background:#c0392b;color:#fff}
+.btn:hover{opacity:.85}
+.bk{background:none;border:1px solid var(--gold);color:var(--gold);padding:8px 20px;border-radius:20px;cursor:pointer;font-family:inherit;margin:20px 0;transition:.3s}
+.bk:hover{background:var(--gold);color:var(--bg)}
+.st{color:var(--gold);font-size:1.3rem;margin:30px 0 15px;padding-bottom:8px;border-bottom:2px solid rgba(201,168,76,.2)}
+.pc{background:var(--card);border-radius:var(--r);padding:20px;border:1px solid rgba(201,168,76,.1)}
+.pc h3{color:var(--gold);margin-bottom:6px}
+.pc .pn{color:var(--green);font-size:.9rem}
+.pc .pv{color:var(--text2);font-size:.9rem;margin-top:8px;line-height:1.6;max-height:60px;overflow:hidden}
+.pnd{background:var(--card);border-radius:var(--r);padding:20px;margin:12px 0;border-right:4px solid #e67e22}
+.pnd h3{color:var(--gold)}.pnd .acts{margin-top:12px;display:flex;gap:8px}
+footer{background:var(--bg2);border-top:2px solid var(--gold);padding:30px 20px;margin-top:40px;text-align:center}
+footer .logo{font-size:1.3rem;margin-bottom:10px;display:block}
+footer p{color:var(--text2);font-size:.85rem;line-height:1.6}
+.page{display:none}.page.on{display:block}
+@media(max-width:768px){.grid{grid-template-columns:1fr}.sbar{gap:20px}.sn{font-size:1.4rem}nav .ctr{justify-content:center}.flt select{min-width:110px}}</style>
+</head>
+<body>
+<nav><div class="ctr"><span class="logo" onclick="showPage('p-home')" id="logoText"></span><div class="nv"><button class="on" onclick="showPage('p-home')" id="navHome"></button><button onclick="showPage('p-search')" id="navSearch"></button><button onclick="showPage('p-admin')" id="navAdmin"></button></div></div></nav>
+<div class="ctr">
+<div id="p-home" class="page on">
+<div class="hero"><h1 id="heroTitle"></h1><p id="heroSub"></p></div>
+<div class="sbar"><div class="si"><div class="sn">6</div><div class="sl" id="statPoets"></div></div><div class="si"><div class="sn">10</div><div class="sl" id="statPoems"></div></div><div class="si"><div class="sn">3</div><div class="sl" id="statRegions"></div></div></div>
+<div class="sb"><input type="text" id="hs" placeholder=""></div>
+<h2 class="st" id="secPoets"></h2>
+<div class="grid" id="pg"></div>
+</div>
+<div id="p-poet" class="page">
+<button class="bk" onclick="showPage('p-home')" id="backBtn"></button>
+<div id="pd"></div>
+</div>
+<div id="p-search" class="page">
+<h2 class="st" id="secSearch"></h2>
+<div class="sb"><input type="text" id="sq" placeholder=""></div>
+<div class="flt">
+<select id="fr"><option value=""></option></select>
+<select id="ft"><option value=""></option></select>
+<select id="fm"><option value=""></option></select>
+<select id="frl"><option value=""></option></select>
+</div>
+<div class="rc" id="src"></div>
+<div class="grid" id="sr"></div>
+</div>
+<div id="p-admin" class="page">
+<h2 class="st" id="secAdmin"></h2>
+<div class="an" id="adminNav"></div>
+<div id="ac"></div>
+</div>
+</div>
+<footer><span class="logo" id="footLogo"></span><p id="footDesc"></p></footer>
+<script>
+var D={poets:[
+{id:1,n:"\u0639\u0628\u062f\u0627\u0644\u0644\u0647 \u0627\u0644\u062e\u0628\u0627\u0632",b:"\u0634\u0627\u0639\u0631 \u0645\u0646 \u0627\u0644\u0642\u0637\u064a\u0641\u060c \u064a\u064f\u0639\u062f \u0645\u0646 \u0623\u0628\u0631\u0632 \u0634\u0639\u0631\u0627\u0621 \u0627\u0644\u0645\u0646\u0637\u0642\u0629 \u0641\u064a \u0627\u0644\u0634\u0639\u0631 \u0627\u0644\u0641\u0635\u064a\u062d \u0648\u0627\u0644\u0634\u0639\u0628\u064a. \u0644\u0647 \u0639\u062f\u0629 \u062f\u0648\u0627\u0648\u064a\u0646 \u0634\u0639\u0631\u064a\u0629.",r:"\u0627\u0644\u0642\u0637\u064a\u0641",c:"\u0627\u0644\u0642\u0637\u064a\u0641",co:"\u0627\u0644\u0633\u0639\u0648\u062f\u064a\u0629",y:1975,pc:2},
+{id:2,n:"\u062d\u0633\u0646 \u0627\u0644\u0639\u0628\u062f\u0627\u0644\u0644\u0647",b:"\u0634\u0627\u0639\u0631 \u0623\u062d\u0633\u0627\u0626\u064a \u0645\u0639\u0631\u0648\u0641 \u0628\u0642\u0635\u0627\u0626\u062f\u0647 \u0641\u064a \u0627\u0644\u063a\u0632\u0644 \u0648\u0627\u0644\u062d\u0643\u0645\u0629. \u0644\u0647 \u062d\u0636\u0648\u0631 \u0628\u0627\u0631\u0632 \u0641\u064a \u0627\u0644\u0633\u0627\u062d\u0629 \u0627\u0644\u0623\u062f\u0628\u064a\u0629.",r:"\u0627\u0644\u0623\u062d\u0633\u0627\u0621",c:"\u0627\u0644\u0647\u0641\u0648\u0641",co:"\u0627\u0644\u0633\u0639\u0648\u062f\u064a\u0629",y:1980,pc:2},
+{id:3,n:"\u0641\u0627\u0637\u0645\u0629 \u0627\u0644\u0645\u062d\u0645\u062f",b:"\u0634\u0627\u0639\u0631\u0629 \u0628\u062d\u0631\u064a\u0646\u064a\u0629 \u0645\u062a\u0645\u064a\u0632\u0629 \u0641\u064a \u0627\u0644\u0634\u0639\u0631 \u0627\u0644\u0641\u0635\u064a\u062d \u0648\u0627\u0644\u062d\u0631. \u062d\u0627\u0635\u0644\u0629 \u0639\u0644\u0649 \u0639\u062f\u0629 \u062c\u0648\u0627\u0626\u0632 \u0623\u062f\u0628\u064a\u0629.",r:"\u0627\u0644\u0628\u062d\u0631\u064a\u0646",c:"\u0627\u0644\u0645\u0646\u0627\u0645\u0629",co:"\u0627\u0644\u0628\u062d\u0631\u064a\u0646",y:1985,pc:2},
+{id:4,n:"\u0639\u0644\u064a \u0627\u0644\u062c\u0627\u0633\u0645",b:"\u0634\u0627\u0639\u0631 \u0642\u0637\u064a\u0641\u064a \u0645\u0646 \u062c\u064a\u0644 \u0627\u0644\u0634\u0628\u0627\u0628\u060c \u064a\u0643\u062a\u0628 \u0627\u0644\u0634\u0639\u0631 \u0627\u0644\u0634\u0639\u0628\u064a \u0648\u0627\u0644\u0641\u0635\u064a\u062d.",r:"\u0627\u0644\u0642\u0637\u064a\u0641",c:"\u0633\u064a\u0647\u0627\u062a",co:"\u0627\u0644\u0633\u0639\u0648\u062f\u064a\u0629",y:1990,pc:1},
+{id:5,n:"\u0645\u062d\u0645\u062f \u0627\u0644\u0635\u0627\u0644\u062d",b:"\u0634\u0627\u0639\u0631 \u0645\u0646 \u0627\u0644\u0642\u0637\u064a\u0641 \u0645\u062a\u062e\u0635\u0635 \u0641\u064a \u0627\u0644\u0634\u0639\u0631 \u0627\u0644\u0646\u0628\u0637\u064a \u0648\u0627\u0644\u0634\u0639\u0628\u064a.",r:"\u0627\u0644\u0642\u0637\u064a\u0641",c:"\u062a\u0627\u0631\u0648\u062a",co:"\u0627\u0644\u0633\u0639\u0648\u062f\u064a\u0629",y:1982,pc:2},
+{id:6,n:"\u0632\u064a\u0646\u0628 \u0627\u0644\u062d\u0633\u064a\u0646",b:"\u0634\u0627\u0639\u0631\u0629 \u0623\u062d\u0633\u0627\u0626\u064a\u0629 \u062a\u0643\u062a\u0628 \u0641\u064a \u0627\u0644\u0634\u0639\u0631 \u0627\u0644\u0641\u0635\u064a\u062d \u0648\u0627\u0644\u0648\u062c\u062f\u0627\u0646\u064a.",r:"\u0627\u0644\u0623\u062d\u0633\u0627\u0621",c:"\u0627\u0644\u0645\u0628\u0631\u0632",co:"\u0627\u0644\u0633\u0639\u0648\u062f\u064a\u0629",y:1988,pc:1},
+],poems:[
+{id:1,pid:1,t:"\u0642\u0635\u064a\u062f\u0629 \u0627\u0644\u0648\u0637\u0646",co:"\u064a\u0627 \u0648\u0637\u0646\u064a \u0627\u0644\u063a\u0627\u0644\u064a \u0639\u0644\u0649 \u0627\u0644\u0642\u0644\u0628 \u0645\u0646\u0632\u0644\u0643\n\u0641\u064a \u0643\u0644 \u0634\u0631\u064a\u0627\u0646 \u062f\u0645\u064a \u064a\u062c\u0631\u064a \u062d\u0628\u0643\n\u0645\u0646 \u0634\u0631\u0642\u0643 \u0627\u0644\u0632\u0627\u0647\u064a \u0644\u063a\u0631\u0628\u0643 \u0648\u0634\u0645\u0627\u0644\u0643\n\u0623\u0646\u062a \u0627\u0644\u0636\u064a\u0627\u0621 \u0648\u0623\u0646\u062a \u0646\u0628\u0636 \u0641\u0624\u0627\u062f\u064a",ty:"\u0641\u0635\u064a\u062d",m:"\u0627\u0644\u0637\u0648\u064a\u0644",rl:"\u0643",s:"published"},
+{id:2,pid:1,t:"\u0641\u064a \u062d\u0628 \u0627\u0644\u0642\u0637\u064a\u0641",co:"\u0642\u0637\u064a\u0641 \u0627\u0644\u062e\u064a\u0631 \u064a\u0627 \u0623\u0645 \u0627\u0644\u0646\u062e\u064a\u0644\n\u064a\u0627 \u0639\u064a\u0648\u0646 \u0627\u0644\u0645\u0627\u0621 \u0648\u0627\u0644\u0637\u064a\u0646 \u0627\u0644\u0623\u0635\u064a\u0644\n\u0643\u0644 \u062d\u0627\u0631\u0629 \u0641\u064a\u0643 \u062a\u062d\u0643\u064a \u0642\u0635\u0629\n\u0645\u0646 \u0632\u0645\u0627\u0646 \u0627\u0644\u062c\u062f \u0644\u0644\u062d\u0627\u0636\u0631 \u062c\u0645\u064a\u0644",ty:"\u0634\u0639\u0628\u064a",m:"\u0627\u0644\u0631\u0645\u0644",rl:"\u0644",s:"published"},
+{id:3,pid:2,t:"\u063a\u0632\u0644 \u0623\u062d\u0633\u0627\u0626\u064a",co:"\u0639\u064a\u0648\u0646\u0643 \u064a\u0627 \u062d\u0644\u0648\u0629 \u0633\u062d\u0631 \u0645\u0627 \u0644\u0647 \u062d\u062f\u0648\u062f\n\u0643\u0623\u0646 \u0627\u0644\u0644\u0647 \u0635\u0627\u063a \u0641\u064a\u0647\u0627 \u062c\u0645\u0627\u0644 \u0627\u0644\u0648\u0631\u0648\u062f\n\u0625\u0630\u0627 \u0646\u0638\u0631\u062a\u064a \u0634\u0641\u062a \u0627\u0644\u062f\u0646\u064a\u0627 \u062a\u0628\u062a\u0633\u0645\n\u0648\u0625\u0630\u0627 \u063a\u0628\u062a\u064a \u0635\u0627\u0631 \u0627\u0644\u0643\u0648\u0646 \u0628\u0644\u0627 \u0648\u062c\u0648\u062f",ty:"\u0641\u0635\u064a\u062d",m:"\u0627\u0644\u0628\u0633\u064a\u0637",rl:"\u062f",s:"published"},
+{id:4,pid:2,t:"\u062d\u0643\u0645\u0629 \u0627\u0644\u0632\u0645\u0627\u0646",co:"\u064a\u0642\u0648\u0644\u0648\u0646 \u0627\u0644\u0632\u0645\u0627\u0646 \u064a\u062f\u0627\u0648\u064a \u0643\u0644 \u062c\u0631\u062d\n\u0648\u0623\u0642\u0648\u0644 \u0627\u0644\u0632\u0645\u0627\u0646 \u064a\u0639\u0644\u0645\u0646\u0627 \u0627\u0644\u0635\u0628\u0631\n\u0645\u0627 \u0643\u0644 \u064a\u0648\u0645 \u062d\u0632\u0646 \u064a\u062f\u0648\u0645 \u0628\u062d\u0627\u0644\u0647\n\u0648\u0644\u0627 \u0643\u0644 \u0641\u0631\u062d \u064a\u0628\u0642\u0649 \u0639\u0644\u0649 \u0627\u0644\u062f\u0647\u0631",ty:"\u0634\u0639\u0628\u064a",m:"\u0627\u0644\u0648\u0627\u0641\u0631",rl:"\u062d",s:"published"},
+{id:5,pid:3,t:"\u0623\u0646\u0627 \u0648\u0627\u0644\u0628\u062d\u0631",co:"\u0639\u0644\u0649 \u0634\u0627\u0637\u0626 \u0627\u0644\u0645\u0646\u0627\u0645\u0629 \u0648\u0642\u0641\u062a \u0648\u062d\u062f\u064a\n\u0623\u0646\u0627\u062c\u064a \u0645\u0648\u062c \u0627\u0644\u0628\u062d\u0631 \u0641\u064a \u0644\u064a\u0644 \u0647\u0627\u062f\u064a\n\u0633\u0623\u0644\u062a \u0627\u0644\u0645\u0648\u062c \u0639\u0646 \u0645\u0639\u0646\u0649 \u0627\u0644\u062d\u064a\u0627\u0629\n\u0641\u0642\u0627\u0644 \u062a\u0639\u0627\u0644 \u0648\u0627\u0633\u0645\u0639 \u0635\u0648\u062a \u0641\u0624\u0627\u062f\u064a",ty:"\u0641\u0635\u064a\u062d",m:"\u0627\u0644\u0643\u0627\u0645\u0644",rl:"\u064a",s:"published"},
+{id:6,pid:3,t:"\u0646\u0633\u0627\u0621 \u0645\u0646 \u0646\u0648\u0631",co:"\u0646\u062d\u0646 \u0627\u0644\u0646\u0633\u0627\u0621 \u0627\u0644\u0644\u064a \u0643\u062a\u0628\u0646\u0627 \u0627\u0644\u062a\u0627\u0631\u064a\u062e\n\u0628\u062d\u0628\u0631 \u0627\u0644\u0635\u0628\u0631 \u0639\u0644\u0649 \u0623\u0648\u0631\u0627\u0642 \u0627\u0644\u0632\u0645\u0627\u0646\n\u0646\u062d\u0646 \u0627\u0644\u0644\u064a \u0631\u0628\u0651\u064a\u0646\u0627 \u0631\u062c\u0627\u0644 \u0648\u0623\u0645\u0645\n\u0648\u0628\u0646\u064a\u0646\u0627 \u0623\u0648\u0637\u0627\u0646 \u0645\u0646 \u063a\u064a\u0631 \u0639\u0646\u0648\u0627\u0646",ty:"\u0641\u0635\u064a\u062d",m:"\u0627\u0644\u062e\u0641\u064a\u0641",rl:"\u0646",s:"published"},
+{id:7,pid:4,t:"\u0634\u0628\u0627\u0628 \u0627\u0644\u064a\u0648\u0645",co:"\u062c\u064a\u0644 \u062c\u062f\u064a\u062f \u064a\u062d\u0645\u0644 \u0623\u062d\u0644\u0627\u0645 \u0643\u0628\u064a\u0631\u0629\n\u0648\u0637\u0645\u0648\u062d \u0645\u0627 \u0644\u0647 \u0633\u0642\u0641 \u0648\u0644\u0627 \u062d\u062f\n\u0646\u0628\u0646\u064a \u0645\u0633\u062a\u0642\u0628\u0644\u0646\u0627 \u0628\u0623\u064a\u062f\u064a\u0646\u0627 \u0646\u062d\u0646\n\u0645\u0627 \u0646\u0646\u062a\u0638\u0631 \u0645\u0646 \u063a\u064a\u0631\u0646\u0627 \u0623\u064a \u0633\u0646\u062f",ty:"\u0634\u0639\u0628\u064a",m:"\u0627\u0644\u0645\u062a\u0642\u0627\u0631\u0628",rl:"\u062f",s:"published"},
+{id:8,pid:4,t:"\u0631\u0633\u0627\u0644\u0629 \u0623\u0645\u0644",co:"\u0641\u064a \u0643\u0644 \u0638\u0644\u0645\u0629 \u0644\u0627\u0632\u0645 \u064a\u0637\u0644\u0639 \u0646\u0648\u0631\n\u0648\u0628\u0639\u062f \u0643\u0644 \u0644\u064a\u0644 \u0644\u0627\u0632\u0645 \u064a\u062c\u064a \u0635\u0628\u0627\u062d\n\u0644\u0627 \u062a\u064a\u0623\u0633 \u064a\u0627 \u0635\u0627\u062d\u0628\u064a \u0645\u0646 \u062d\u0627\u0644\u0643\n\u062a\u0631\u0649 \u0627\u0644\u0644\u0647 \u0645\u0639 \u0643\u0644 \u0642\u0644\u0628 \u0645\u062c\u0631\u0627\u062d",ty:"\u0634\u0639\u0628\u064a",m:"\u0627\u0644\u0631\u062c\u0632",rl:"\u062d",s:"pending"},
+{id:9,pid:5,t:"\u062a\u0627\u0631\u0648\u062a \u0627\u0644\u0642\u062f\u064a\u0645\u0629",co:"\u064a\u0627 \u062c\u0632\u064a\u0631\u0629 \u062a\u0627\u0631\u0648\u062a \u064a\u0627 \u0628\u0646\u062a \u0627\u0644\u0628\u062d\u0631\n\u0641\u064a\u0643 \u062a\u0627\u0631\u064a\u062e \u0639\u0645\u0631\u0647 \u0622\u0644\u0627\u0641 \u0633\u0646\u064a\u0646\n\u0645\u0646 \u062d\u0636\u0627\u0631\u0629 \u062f\u0644\u0645\u0648\u0646 \u0644\u0644\u062d\u064a\u0646 \u0628\u0627\u0642\u064a\n\u0622\u062b\u0627\u0631\u0643 \u0634\u0627\u0647\u062f\u0629 \u0639\u0644\u0649 \u0643\u0644 \u062d\u064a\u0646",ty:"\u0634\u0639\u0628\u064a",m:"\u0627\u0644\u0647\u0632\u062c",rl:"\u0646",s:"published"},
+{id:10,pid:5,t:"\u0644\u064a\u0644\u0629 \u0635\u064a\u062f",co:"\u0645\u0646 \u0642\u0628\u0644 \u0627\u0644\u0641\u062c\u0631 \u0646\u0631\u0648\u062d \u0644\u0644\u0628\u062d\u0631 \u0635\u064a\u062f\n\u0648\u0627\u0644\u0634\u0645\u0633 \u0628\u0639\u062f\u0647\u0627 \u0646\u0627\u064a\u0645\u0629 \u0648\u0631\u0627 \u0627\u0644\u0633\u062d\u0627\u0628\n\u0646\u0631\u0643\u0628 \u0627\u0644\u0645\u0631\u0643\u0628 \u0648\u0646\u0645\u062f \u0627\u0644\u0634\u0628\u0627\u0643\n\u0648\u0646\u0646\u062a\u0638\u0631 \u0631\u0632\u0642 \u0627\u0644\u0644\u0647 \u0628\u0644\u0627 \u062d\u0633\u0627\u0628",ty:"\u0634\u0639\u0628\u064a",m:"\u0627\u0644\u0633\u0631\u064a\u0639",rl:"\u0628",s:"published"},
+{id:11,pid:6,t:"\u0648\u062c\u062f\u0627\u0646\u064a",co:"\u0641\u064a \u0635\u0645\u062a \u0627\u0644\u0644\u064a\u0644 \u0623\u0643\u062a\u0628 \u0623\u062d\u0631\u0641 \u0627\u0644\u0634\u0648\u0642\n\u0639\u0644\u0649 \u0623\u0648\u0631\u0627\u0642 \u0642\u0644\u0628\u064a \u0627\u0644\u0645\u062a\u0639\u0628 \u0627\u0644\u062d\u0632\u064a\u0646\n\u0623\u0628\u062d\u062b \u0639\u0646 \u0645\u0639\u0646\u0649 \u0644\u0647\u0627\u0644\u0648\u062c\u0648\u062f\n\u0648\u0623\u0633\u0623\u0644 \u0644\u064a\u0647 \u0627\u0644\u062f\u0645\u0639 \u0635\u0627\u0631 \u0631\u0641\u064a\u0642 \u0627\u0644\u0639\u064a\u0646",ty:"\u0641\u0635\u064a\u062d",m:"\u0627\u0644\u0637\u0648\u064a\u0644",rl:"\u0646",s:"published"},
+{id:12,pid:6,t:"\u0631\u0628\u064a\u0639 \u0627\u0644\u0623\u062d\u0633\u0627\u0621",co:"\u0625\u0630\u0627 \u062c\u0627 \u0627\u0644\u0631\u0628\u064a\u0639 \u0648\u0627\u0644\u0623\u062d\u0633\u0627\u0621 \u062a\u0632\u0647\u0651\u0631\n\u062a\u0634\u0648\u0641 \u0627\u0644\u0646\u062e\u0644 \u064a\u0631\u0642\u0635 \u0645\u0639 \u0627\u0644\u0646\u0633\u064a\u0645\n\u0648\u0627\u0644\u0639\u064a\u0648\u0646 \u062a\u062c\u0631\u064a \u0645\u0627\u064a \u0635\u0627\u0641\u064a \u0648\u0639\u0630\u0628\n\u0648\u0627\u0644\u062c\u0648 \u064a\u0635\u064a\u0631 \u0645\u062b\u0644 \u062d\u0644\u0645 \u0642\u062f\u064a\u0645",ty:"\u0641\u0635\u064a\u062d",m:"\u0627\u0644\u0645\u0646\u0633\u0631\u062d",rl:"\u0645",s:"pending"},
+]};
+
+var L={siteName:"\u0634\u0639\u0631\u0627\u0621 \u0627\u0644\u0642\u0637\u064a\u0641",subtitle:"\u0645\u0648\u0633\u0648\u0639\u0629 \u0634\u0639\u0631\u064a\u0629 \u062a\u062c\u0645\u0639 \u0631\u0648\u0627\u0626\u0639 \u0627\u0644\u0634\u0639\u0631 \u0645\u0646 \u0627\u0644\u0642\u0637\u064a\u0641 \u0648\u0627\u0644\u0623\u062d\u0633\u0627\u0621 \u0648\u0627\u0644\u0628\u062d\u0631\u064a\u0646",home:"\u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629",search:"\u0627\u0644\u0628\u062d\u062b \u0627\u0644\u0645\u062a\u0642\u062f\u0645",admin:"\u0644\u0648\u062d\u0629 \u0627\u0644\u062a\u062d\u0643\u0645",poetCount:"\u0639\u062f\u062f \u0627\u0644\u0634\u0639\u0631\u0627\u0621",poemCountL:"\u0639\u062f\u062f \u0627\u0644\u0642\u0635\u0627\u0626\u062f",regionCount:"\u0627\u0644\u0645\u0646\u0627\u0637\u0642",searchPH:"\u0627\u0628\u062d\u062b \u0639\u0646 \u0634\u0627\u0639\u0631 \u0623\u0648 \u0642\u0635\u064a\u062f\u0629...",thePoets:"\u0627\u0644\u0634\u0639\u0631\u0627\u0621",poems:"\u0642\u0635\u064a\u062f\u0629",noRes:"\u0644\u0627 \u062a\u0648\u062c\u062f \u0646\u062a\u0627\u0626\u062c",hisPoems:"\u0627\u0644\u0642\u0635\u0627\u0626\u062f",rhyme:"\u0627\u0644\u0642\u0627\u0641\u064a\u0629",back:"\u0631\u062c\u0648\u0639",filterSearch:"\u0627\u0628\u062d\u062b \u0641\u064a \u0627\u0644\u0642\u0635\u0627\u0626\u062f...",allRegions:"\u0643\u0644 \u0627\u0644\u0645\u0646\u0627\u0637\u0642",allTypes:"\u0643\u0644 \u0627\u0644\u0623\u0646\u0648\u0627\u0639",allMeters:"\u0643\u0644 \u0627\u0644\u0628\u062d\u0648\u0631",allRhymes:"\u0643\u0644 \u0627\u0644\u0642\u0648\u0627\u0641\u064a",found:"\u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649",result:"\u0646\u062a\u064a\u062c\u0629",poetsTab:"\u0627\u0644\u0634\u0639\u0631\u0627\u0621",poemsTab:"\u0627\u0644\u0642\u0635\u0627\u0626\u062f",tagsTab:"\u0627\u0644\u0648\u0633\u0648\u0645",reviewTab:"\u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629",statsTab:"\u0627\u0644\u0625\u062d\u0635\u0627\u0626\u064a\u0627\u062a",name:"\u0627\u0644\u0627\u0633\u0645",region:"\u0627\u0644\u0645\u0646\u0637\u0642\u0629",city:"\u0627\u0644\u0645\u062f\u064a\u0646\u0629",poemCount:"\u0627\u0644\u0642\u0635\u0627\u0626\u062f",title:"\u0627\u0644\u0639\u0646\u0648\u0627\u0646",poet:"\u0627\u0644\u0634\u0627\u0639\u0631",type:"\u0627\u0644\u0646\u0648\u0639",meter:"\u0627\u0644\u0628\u062d\u0631",status:"\u0627\u0644\u062d\u0627\u0644\u0629",approve:"\u0646\u0634\u0631",reject:"\u0631\u0641\u0636",noPending:"\u0644\u0627 \u062a\u0648\u062c\u062f \u0642\u0635\u0627\u0626\u062f \u0628\u0627\u0646\u062a\u0638\u0627\u0631 \u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629",byRegion:"\u062d\u0633\u0628 \u0627\u0644\u0645\u0646\u0637\u0642\u0629",byType:"\u062d\u0633\u0628 \u0627\u0644\u0646\u0648\u0639",byMeter:"\u062d\u0633\u0628 \u0627\u0644\u0628\u062d\u0631",};
+
+var F={r:["\u0627\u0644\u0642\u0637\u064a\u0641","\u0627\u0644\u0623\u062d\u0633\u0627\u0621","\u0627\u0644\u0628\u062d\u0631\u064a\u0646",],t:["\u0641\u0635\u064a\u062d","\u0634\u0639\u0628\u064a",],m:["\u0627\u0644\u0637\u0648\u064a\u0644","\u0627\u0644\u0631\u0645\u0644","\u0627\u0644\u0628\u0633\u064a\u0637","\u0627\u0644\u0648\u0627\u0641\u0631","\u0627\u0644\u0643\u0627\u0645\u0644","\u0627\u0644\u062e\u0641\u064a\u0641","\u0627\u0644\u0645\u062a\u0642\u0627\u0631\u0628","\u0627\u0644\u0631\u062c\u0632","\u0627\u0644\u0647\u0632\u062c","\u0627\u0644\u0633\u0631\u064a\u0639","\u0627\u0644\u0645\u0646\u0633\u0631\u062d",],rl:["\u0643","\u0644","\u062f","\u062d","\u064a","\u0646","\u0628","\u0645",]};
+
+
+function $(id){return document.getElementById(id)}
+function showPage(p){document.querySelectorAll('.page').forEach(function(e){e.classList.remove('on')});$(p).classList.add('on');document.querySelectorAll('.nv button').forEach(function(b){b.classList.remove('on')});var m={'p-home':0,'p-search':1,'p-admin':2};if(m[p]!==undefined)document.querySelectorAll('.nv button')[m[p]].classList.add('on');window.scrollTo(0,0);if(p==='p-search')doSearch()}
+function renderPoets(f){var g=$('pg');var h='';var ps=D.poets;if(f){f=f.toLowerCase();ps=ps.filter(function(p){return p.n.indexOf(f)>-1||p.r.indexOf(f)>-1||p.c.indexOf(f)>-1})}ps.forEach(function(p){h+='<div class="card" onclick="showPoet('+p.id+')"><div class="av">'+p.n[0]+'</div><h3>'+p.n+'</h3><div class="rg">'+p.r+' - '+p.c+'</div><div class="ct"><span class="tag">'+p.pc+' '+L.poems+'</span> <span class="tag" style="background:rgba(201,168,76,.15);color:#c9a84c">'+p.y+'</span></div></div>'});g.innerHTML=h||'<p style="text-align:center;color:#b8a89a">'+L.noRes+'</p>'}
+function showPoet(id){var p=D.poets.find(function(x){return x.id===id});if(!p)return;showPage('p-poet');var pm=D.poems.filter(function(x){return x.pid===id});var h='<div class="ph"><div class="av">'+p.n[0]+'</div><h1>'+p.n+'</h1><div class="mt">'+p.r+' - '+p.c+' | '+p.co+' | '+p.y+'</div></div>';h+='<div class="bio">'+p.b+'</div>';h+='<h2 class="st">'+L.hisPoems+' ('+pm.filter(function(x){return x.s==="published"}).length+')</h2>';pm.forEach(function(m){if(m.s!=='published')return;h+='<div class="pi"><div class="pih" onclick="toggleP('+m.id+')"><h3>'+m.t+'</h3><div class="bds"><span class="bd bd-t">'+m.ty+'</span><span class="bd bd-m">'+m.m+'</span><span class="bd bd-r">'+L.rhyme+': '+m.rl+'</span></div></div><div class="pic" id="pc-'+m.id+'">'+m.co.replace(/\n/g,'<br>')+'</div></div>'});$('pd').innerHTML=h}
+function toggleP(id){var e=$('pc-'+id);if(e)e.classList.toggle('show')}
+function doSearch(){var q=$('sq').value;var r=$('fr').value;var t=$('ft').value;var m=$('fm').value;var rl=$('frl').value;var res=D.poems.filter(function(p){if(p.s!=='published')return false;var poet=D.poets.find(function(x){return x.id===p.pid});if(q&&p.t.indexOf(q)===-1&&p.co.indexOf(q)===-1&&poet.n.indexOf(q)===-1)return false;if(r&&poet.r!==r)return false;if(t&&p.ty!==t)return false;if(m&&p.m!==m)return false;if(rl&&p.rl!==rl)return false;return true});$('src').textContent=L.found+' '+res.length+' '+L.result;var h='';res.forEach(function(p){var poet=D.poets.find(function(x){return x.id===p.pid});h+='<div class="pc" onclick="showPoet('+p.pid+')"><h3>'+p.t+'</h3><div class="pn">'+poet.n+' - '+poet.r+'</div><div class="bds" style="margin-top:6px"><span class="bd bd-t">'+p.ty+'</span><span class="bd bd-m">'+p.m+'</span></div><div class="pv">'+p.co.split('\n')[0]+'</div></div>'});$('sr').innerHTML=h}
+function showAdmin(s){document.querySelectorAll('.an button').forEach(function(b){b.classList.remove('on')});event.target.classList.add('on');var h='';if(s==='poets'){h='<table><tr><th>#</th><th>'+L.name+'</th><th>'+L.region+'</th><th>'+L.city+'</th><th>'+L.poemCount+'</th></tr>';D.poets.forEach(function(p){h+='<tr><td>'+p.id+'</td><td>'+p.n+'</td><td>'+p.r+'</td><td>'+p.c+'</td><td>'+p.pc+'</td></tr>'});h+='</table>'}
+else if(s==='poems'){h='<table><tr><th>#</th><th>'+L.title+'</th><th>'+L.poet+'</th><th>'+L.type+'</th><th>'+L.meter+'</th><th>'+L.status+'</th></tr>';D.poems.forEach(function(p){var poet=D.poets.find(function(x){return x.id===p.pid});h+='<tr><td>'+p.id+'</td><td>'+p.t+'</td><td>'+(poet?poet.n:'')+'</td><td>'+p.ty+'</td><td>'+p.m+'</td><td>'+p.s+'</td></tr>'});h+='</table>'}
+else if(s==='review'){var pnd=D.poems.filter(function(p){return p.s==='pending'});if(pnd.length===0){h='<p style="text-align:center;color:#b8a89a;padding:40px">'+L.noPending+'</p>'}else{pnd.forEach(function(p){var poet=D.poets.find(function(x){return x.id===p.pid});h+='<div class="pnd"><h3>'+p.t+'</h3><div style="color:#b8a89a;margin:4px 0">'+poet.n+' | '+p.ty+' | '+p.m+'</div><div style="white-space:pre-line;color:#b8a89a;margin:8px 0;line-height:1.8">'+p.co.replace(/\n/g,'<br>')+'</div><div class="acts"><button class="btn bgr" onclick="approveP('+p.id+')">'+L.approve+'</button><button class="btn br" onclick="rejectP('+p.id+')">'+L.reject+'</button></div></div>'})}}
+else if(s==='stats'){h='<div class="grid">';var regions={};D.poets.forEach(function(p){regions[p.r]=(regions[p.r]||0)+1});h+='<div class="pc"><h3>'+L.byRegion+'</h3>';for(var k in regions)h+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span>'+k+'</span><span style="color:#c9a84c;font-weight:700">'+regions[k]+'</span></div>';h+='</div>';var types={};D.poems.filter(function(p){return p.s==='published'}).forEach(function(p){types[p.ty]=(types[p.ty]||0)+1});h+='<div class="pc"><h3>'+L.byType+'</h3>';for(var k in types)h+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span>'+k+'</span><span style="color:#c9a84c;font-weight:700">'+types[k]+'</span></div>';h+='</div>';var meters={};D.poems.filter(function(p){return p.s==='published'}).forEach(function(p){meters[p.m]=(meters[p.m]||0)+1});h+='<div class="pc"><h3>'+L.byMeter+'</h3>';for(var k in meters)h+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span>'+k+'</span><span style="color:#c9a84c;font-weight:700">'+meters[k]+'</span></div>';h+='</div></div>'}
+$('ac').innerHTML=h}
+function approveP(id){D.poems.forEach(function(p){if(p.id===id)p.s='published'});showAdmin('review');renderPoets()}
+function rejectP(id){D.poems.forEach(function(p){if(p.id===id)p.s='rejected'});showAdmin('review')}
+document.addEventListener('DOMContentLoaded',function(){renderPoets();$('hs').addEventListener('input',function(){renderPoets(this.value)});$('sq').addEventListener('input',function(){doSearch()});$('fr').addEventListener('change',doSearch);$('ft').addEventListener('change',doSearch);$('fm').addEventListener('change',doSearch);$('frl').addEventListener('change',doSearch)});
+
+// Init UI labels
+document.addEventListener('DOMContentLoaded',function(){
+document.getElementById('logoText').textContent=L.siteName;
+document.getElementById('navHome').textContent=L.home;
+document.getElementById('navSearch').textContent=L.search;
+document.getElementById('navAdmin').textContent=L.admin;
+document.getElementById('heroTitle').textContent=L.siteName;
+document.getElementById('heroSub').textContent=L.subtitle;
+document.getElementById('statPoets').textContent=L.poetCount;
+document.getElementById('statPoems').textContent=L.poemCountL;
+document.getElementById('statRegions').textContent=L.regionCount;
+document.getElementById('hs').placeholder=L.searchPH;
+document.getElementById('secPoets').textContent=L.thePoets;
+document.getElementById('backBtn').textContent=L.back;
+document.getElementById('secSearch').textContent=L.search;
+document.getElementById('sq').placeholder=L.filterSearch;
+document.getElementById('secAdmin').textContent=L.admin;
+document.getElementById('footLogo').textContent=L.siteName;
+document.getElementById('footDesc').textContent=L.subtitle;
+document.title=L.siteName;
+// Populate filter dropdowns
+var fr=document.getElementById('fr');fr.options[0].text=L.allRegions;
+F.r.forEach(function(v){var o=document.createElement('option');o.value=v;o.text=v;fr.add(o)});
+var ft=document.getElementById('ft');ft.options[0].text=L.allTypes;
+F.t.forEach(function(v){var o=document.createElement('option');o.value=v;o.text=v;ft.add(o)});
+var fm=document.getElementById('fm');fm.options[0].text=L.allMeters;
+F.m.forEach(function(v){var o=document.createElement('option');o.value=v;o.text=v;fm.add(o)});
+var frl=document.getElementById('frl');frl.options[0].text=L.allRhymes;
+F.rl.forEach(function(v){var o=document.createElement('option');o.value=v;o.text=v;frl.add(o)});
+// Admin nav buttons
+var an=document.getElementById('adminNav');
+[{t:L.poetsTab,s:'poets'},{t:L.poemsTab,s:'poems'},{t:L.reviewTab,s:'review'},{t:L.statsTab,s:'stats'}].forEach(function(x,i){
+var b=document.createElement('button');b.textContent=x.t;b.onclick=function(){showAdmin(x.s)};if(i===0)b.className='on';an.appendChild(b)});
+showAdmin('poets');
+});
+</script>
+</body>
+</html>
