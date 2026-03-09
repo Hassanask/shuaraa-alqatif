@@ -162,6 +162,12 @@
       font-size: 2rem;
       font-weight: 900;
       color: var(--bg);
+      overflow: hidden;
+    }
+    .av img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
     .card h3 {
       text-align: center;
@@ -607,6 +613,7 @@
         {
           id: 1,
           n: "عبدالله الخباز",
+          img: "",
           b: "شاعر من القطيف، يعد من أبرز شعراء المنطقة في الشعر الفصيح والشعبي. له عدة دواوين شعرية.",
           r: "القطيف",
           c: "القطيف",
@@ -617,6 +624,7 @@
         {
           id: 2,
           n: "حسن العبدالله",
+          img: "",
           b: "شاعر أحسائي معروف بقصائده في الغزل والحكمة. له حضور بارز في الساحة الأدبية.",
           r: "الأحساء",
           c: "الهفوف",
@@ -627,6 +635,7 @@
         {
           id: 3,
           n: "فاطمة محمد",
+          img: "",
           b: "شاعرة بحرينية متميزة في الشعر الفصيح والحر. حاصلة على عدة جوائز أدبية.",
           r: "البحرين",
           c: "المنامة",
@@ -637,6 +646,7 @@
         {
           id: 4,
           n: "علي الجاسم",
+          img: "",
           b: "شاعر قطيفي من جيل الشباب، يكتب الشعر الشعبي والفصيح.",
           r: "القطيف",
           c: "سيهات",
@@ -647,6 +657,7 @@
         {
           id: 5,
           n: "محمد الصالح",
+          img: "",
           b: "شاعر من القطيف متخصص في الشعر النبطي والشعبي.",
           r: "القطيف",
           c: "تاروت",
@@ -657,6 +668,7 @@
         {
           id: 6,
           n: "زينب الحسين",
+          img: "",
           b: "شاعرة أحسائية تكتب في الوجدان والوطن. لها حضور في الملتقيات الشعرية.",
           r: "الأحساء",
           c: "المبرز",
@@ -685,8 +697,8 @@
           t: "في حب القطيف",
           co: "قطيف الخير يا أم النخيل
 يا عين الماء يا الطين الأصيل
-كل حارة فيك تحكي جمالك
-من زمان الجد للحديث الطويل",
+كل حارة فيك تروي ذكرياتنا
+وأسوارك الفسيحة تحكي مجدي",
           ty: "شعبي",
           m: "الرمل",
           rl: "ل",
@@ -887,6 +899,7 @@
       newPoetCity: "المدينة",
       newPoetCountry: "الدولة",
       newPoetYear: "سنة الميلاد",
+      newPoetImage: "رابط صورة الشاعر",
       newPoemTitle: "عنوان القصيدة",
       newPoemContent: "محتوى القصيدة",
       newPoemType: "النوع",
@@ -1002,7 +1015,8 @@
       }
 
       ps.forEach(function(p) {
-        h += '<div class="card" onclick="showPoet(' + p.id + ')"><div class="av">' + p.n[0] + '</div><h3>' + p.n + '</h3><div class="rg">' + p.r + ' - ' + p.c + '</div><div class="ct"><span class="tag">' + p.pc + ' ' + L.poems + '</span> <span class="tag" style="background:rgba(201,168,76,.15);color:#c9a84c">' + p.y + '</span></div></div>';
+        var avatarContent = p.img ? '<img src="' + p.img + '" alt="' + p.n + '">' : p.n[0];
+        h += '<div class="card" onclick="showPoet(' + p.id + ')"><div class="av">' + avatarContent + '</div><h3>' + p.n + '</h3><div class="rg">' + p.r + ' - ' + p.c + '</div><div class="ct"><span class="tag">' + p.pc + ' ' + L.poems + '</span> <span class="tag" style="background:rgba(201,168,76,.15);color:#c9a84c">' + p.y + '</span></div></div>';
       });
 
       g.innerHTML = h || '<p style="text-align:center;color:#b8a89a">' + L.noRes + '</p>';
@@ -1032,7 +1046,8 @@
         return x.pid === id;
       });
 
-      var h = '<div class="ph"><div class="av">' + p.n[0] + '</div><h1>' + p.n + '</h1><div class="mt">' + p.r + ' - ' + p.c + ' | ' + p.co + ' | ' + p.y + '</div></div>';
+      var avatarContent = p.img ? '<img src="' + p.img + '" alt="' + p.n + '">' : p.n[0];
+      var h = '<div class="ph"><div class="av">' + avatarContent + '</div><h1>' + p.n + '</h1><div class="mt">' + p.r + ' - ' + p.c + ' | ' + p.co + ' | ' + p.y + '</div></div>';
       h += '<div class="bio">' + p.b + '</div>';
       h += '<h2 class="st">' + L.hisPoems + ' (' + pm.filter(function(x) {
         return x.s === "published";
@@ -1103,10 +1118,11 @@
 
       if (s === 'poets') {
         h = '<div class="d-flex justify-content-between mb-3"><h3>' + L.poetsTab + '</h3><button class="btn bg" onclick="showAddPoetForm()">' + L.addPoet + '</button></div>';
-        h += '<table class="table table-dark table-striped"><tr><th>#</th><th>' + L.name + '</th><th>' + L.region + '</th><th>' + L.city + '</th><th>' + L.poemCount + '</th><th>إجراءات</th></tr>';
+        h += '<table class="table table-dark table-striped"><tr><th>#</th><th>' + L.name + '</th><th>الصورة</th><th>' + L.region + '</th><th>' + L.city + '</th><th>' + L.poemCount + '</th><th>إجراءات</th></tr>';
 
         D.poets.forEach(function(p) {
-          h += '<tr><td>' + p.id + '</td><td>' + p.n + '</td><td>' + p.r + '</td><td>' + p.c + '</td><td>' + p.pc + '</td><td><button class="btn btn-sm btn-warning" onclick="showEditPoetForm(' + p.id + ')">تعديل</button> <button class="btn btn-sm btn-danger" onclick="deletePoet(' + p.id + ')">حذف</button></td></tr>';
+          var avatarContent = p.img ? '<img src="' + p.img + '" alt="' + p.n + '" style="width:40px;height:40px;border-radius:50%;object-fit:cover">' : p.n[0];
+          h += '<tr><td>' + p.id + '</td><td>' + p.n + '</td><td>' + avatarContent + '</td><td>' + p.r + '</td><td>' + p.c + '</td><td>' + p.pc + '</td><td><button class="btn btn-sm btn-warning" onclick="showEditPoetForm(' + p.id + ')">تعديل</button> <button class="btn btn-sm btn-danger" onclick="deletePoet(' + p.id + ')">حذف</button></td></tr>';
         });
 
         h += '</table>';
@@ -1218,6 +1234,7 @@
       var h = '<div class="pnd"><h3>' + L.addPoet + '</h3>';
       h += '<form id="addPoetForm">';
       h += '<div class="mb-3"><label class="form-label">' + L.newPoetName + '</label><input type="text" class="form-control" id="newPoetName" required></div>';
+      h += '<div class="mb-3"><label class="form-label">' + L.newPoetImage + '</label><input type="text" class="form-control" id="newPoetImage" placeholder="رابط صورة (اختياري)"></div>';
       h += '<div class="mb-3"><label class="form-label">' + L.newPoetBio + '</label><textarea class="form-control" id="newPoetBio" rows="3" required></textarea></div>';
       h += '<div class="mb-3"><label class="form-label">' + L.newPoetRegion + '</label><select class="form-select" id="newPoetRegion">';
       F.r.forEach(function(r) {
@@ -1236,6 +1253,7 @@
     // إضافة شاعر
     function addPoet() {
       var name = document.getElementById('newPoetName').value;
+      var img = document.getElementById('newPoetImage').value;
       var bio = document.getElementById('newPoetBio').value;
       var region = document.getElementById('newPoetRegion').value;
       var city = document.getElementById('newPoetCity').value;
@@ -1252,6 +1270,7 @@
       D.poets.push({
         id: newId,
         n: name,
+        img: img,
         b: bio,
         r: region,
         c: city,
@@ -1277,6 +1296,7 @@
       h += '<form id="editPoetForm">';
       h += '<input type="hidden" id="editPoetId" value="' + poet.id + '">';
       h += '<div class="mb-3"><label class="form-label">' + L.newPoetName + '</label><input type="text" class="form-control" id="editPoetName" value="' + poet.n + '" required></div>';
+      h += '<div class="mb-3"><label class="form-label">' + L.newPoetImage + '</label><input type="text" class="form-control" id="editPoetImage" value="' + poet.img + '" placeholder="رابط صورة (اختياري)"></div>';
       h += '<div class="mb-3"><label class="form-label">' + L.newPoetBio + '</label><textarea class="form-control" id="editPoetBio" rows="3" required>' + poet.b + '</textarea></div>';
       h += '<div class="mb-3"><label class="form-label">' + L.newPoetRegion + '</label><select class="form-select" id="editPoetRegion">';
       F.r.forEach(function(r) {
@@ -1296,6 +1316,7 @@
     function updatePoet() {
       var id = parseInt(document.getElementById('editPoetId').value);
       var name = document.getElementById('editPoetName').value;
+      var img = document.getElementById('editPoetImage').value;
       var bio = document.getElementById('editPoetBio').value;
       var region = document.getElementById('editPoetRegion').value;
       var city = document.getElementById('editPoetCity').value;
@@ -1310,6 +1331,7 @@
       D.poets.forEach(function(p) {
         if (p.id === id) {
           p.n = name;
+          p.img = img;
           p.b = bio;
           p.r = region;
           p.c = city;
