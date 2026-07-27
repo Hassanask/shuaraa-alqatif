@@ -175,6 +175,27 @@
   @keyframes spin{ to{ transform:rotate(360deg); } }
   .report-error{color:var(--danger);text-align:center;padding:30px;}
 
+  /* Session autosave */
+  #sessionBar{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    margin-top:12px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;
+    background:#fafbfc;font-size:12px;color:var(--muted);
+  }
+  #autosaveStatus{display:flex;align-items:center;gap:6px;}
+  #autosaveStatus.saved{color:var(--ok);font-weight:700;}
+  #autosaveStatus.warn{color:var(--danger);font-weight:700;}
+  .restore-banner{
+    border:1px solid #f5c97a;background:#fff8e8;border-radius:10px;
+    padding:14px 16px;margin-bottom:14px;font-size:13px;line-height:1.8;
+  }
+  .restore-banner b{color:var(--accent-dark);}
+  .restore-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .restore-actions button{padding:7px 14px;font-size:12px;}
+  .relink-note{
+    background:#eef4ff;border:1px solid #c9d9f5;color:#1a3a7d;
+    border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;
+  }
+
   /* Dashboard */
   #dashboardCard{display:none;}
   .dash-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
@@ -260,6 +281,7 @@
     <h2><span class="step-num">4</span> المعالجة والنتائج</h2>
     <div class="top-actions">
       <button class="btn-primary" id="runBtn">🚀 بدء الاستخراج</button>
+      <button class="btn-primary" id="resumeBtn" style="display:none;background:#1a56db;">▶️ استكمال غير المكتملة</button>
       <button class="btn-outline" id="pauseBtn" style="display:none;">⏸ إيقاف مؤقت</button>
       <button class="btn-danger" id="stopBtn" style="display:none;">⏹ إيقاف العملية</button>
       <button class="btn-outline" id="exportBtn" disabled>⬇️ تصدير إلى Excel</button>
@@ -269,7 +291,13 @@
       <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
       <div class="progress-txt"><span id="progressLabel">جارٍ المعالجة...</span><span id="progressCount">0/0</span></div>
     </div>
+    <div id="sessionBar">
+      <span id="autosaveStatus">💾 الحفظ التلقائي جاهز — لم تبدأ أي جلسة بعد.</span>
+      <button class="btn-outline" id="clearSessionBtn" style="padding:5px 12px;font-size:12px;display:none;">🗑 حذف الجلسة المحفوظة</button>
+    </div>
     <div id="summaryBar"></div>
+    <div id="restoreBanner" style="display:none;"></div>
+    <div id="relinkNote" class="relink-note" style="display:none;"></div>
     <div class="table-scroll" id="resultsWrap">
       <div class="empty">لا توجد نتائج بعد</div>
     </div>
@@ -392,6 +420,7 @@ const folderInput = document.getElementById('folderInput');
 const dropBtn = document.getElementById('dropBtn');
 const fileListInfo = document.getElementById('fileListInfo');
 const runBtn = document.getElementById('runBtn');
+const resumeBtn = document.getElementById('resumeBtn');
 const stopBtn = document.getElementById('stopBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const exportBtn = document.getElementById('exportBtn');
@@ -450,6 +479,227 @@ expectedYearInput.addEventListener('input', ()=>{
   if(results.length > 0) renderTable();
 });
 
+/* ==================== الحفظ التلقائي للجلسة ====================
+   تُحفظ البيانات المستخرجة والفحوص فقط — لا تُحفظ الملفات نفسها، لأن تخزين مئات
+   الصور يتجاوز حصة المتصفح سريعاً. عند الاستعادة يُعاد ربط الملفات باختيار المجلد
+   نفسه (مطابقة بالاسم والحجم) فتعود المعاينة وإعادة المحاولة للعمل.
+   IndexedDB أولاً ثم localStorage احتياطاً — كلاهما يعمل من file:// لكن بسعات مختلفة. */
+const SESSION_DB = 'invoiceExtractorDB';
+const SESSION_STORE = 'sessions';
+const SESSION_KEY = 'lastSession';
+const SESSION_LS_KEY = 'invoice_extractor_session';
+const SESSION_SCHEMA = 1;
+
+const autosaveStatus = document.getElementById('autosaveStatus');
+const clearSessionBtn = document.getElementById('clearSessionBtn');
+const restoreBanner = document.getElementById('restoreBanner');
+const relinkNote = document.getElementById('relinkNote');
+
+let storageBackend = null;   // 'idb' | 'ls' | 'none'
+let autosaveOn = true;
+let saveTimer = null;
+let isRunning = false;
+
+function idbOpen(){
+  return new Promise((resolve, reject)=>{
+    let rq;
+    try{ rq = indexedDB.open(SESSION_DB, 1); }catch(e){ return reject(e); }
+    const timer = setTimeout(()=> reject(new Error('IndexedDB لا يستجيب')), 4000);
+    rq.onupgradeneeded = ()=>{
+      const db = rq.result;
+      if(!db.objectStoreNames.contains(SESSION_STORE)) db.createObjectStore(SESSION_STORE);
+    };
+    rq.onsuccess = ()=>{ clearTimeout(timer); resolve(rq.result); };
+    rq.onerror   = ()=>{ clearTimeout(timer); reject(rq.error || new Error('فشل فتح IndexedDB')); };
+    rq.onblocked = ()=>{ clearTimeout(timer); reject(new Error('IndexedDB محجوب')); };
+  });
+}
+
+function idbRun(mode, fn){
+  return idbOpen().then(db => new Promise((resolve, reject)=>{
+    const tx = db.transaction(SESSION_STORE, mode);
+    const req = fn(tx.objectStore(SESSION_STORE));
+    tx.oncomplete = ()=>{ db.close(); resolve(req ? req.result : undefined); };
+    tx.onerror    = ()=>{ db.close(); reject(tx.error); };
+    tx.onabort    = ()=>{ db.close(); reject(tx.error || new Error('أُلغيت العملية')); };
+  }));
+}
+
+async function storageSet(value){
+  if(storageBackend !== 'ls'){
+    try{
+      await idbRun('readwrite', st => st.put(value, SESSION_KEY));
+      storageBackend = 'idb';
+      return;
+    }catch(e){
+      if(storageBackend === 'idb') throw e;   // كان يعمل ثم فشل: خطأ حقيقي (حصة ممتلئة غالباً)
+    }
+  }
+  localStorage.setItem(SESSION_LS_KEY, JSON.stringify(value));
+  storageBackend = 'ls';
+}
+
+async function storageGet(){
+  try{
+    const v = await idbRun('readonly', st => st.get(SESSION_KEY));
+    if(v){ storageBackend = 'idb'; return v; }
+  }catch(e){ /* نجرّب الاحتياطي */ }
+  try{
+    const raw = localStorage.getItem(SESSION_LS_KEY);
+    if(raw){ storageBackend = 'ls'; return JSON.parse(raw); }
+  }catch(e){}
+  return null;
+}
+
+async function storageClear(){
+  try{ await idbRun('readwrite', st => st.delete(SESSION_KEY)); }catch(e){}
+  try{ localStorage.removeItem(SESSION_LS_KEY); }catch(e){}
+}
+
+function setSaveStatus(text, cls){
+  autosaveStatus.className = cls || '';
+  autosaveStatus.textContent = text;
+}
+
+function timeLabel(ts){
+  try{ return new Date(ts).toLocaleString('ar', { dateStyle:'medium', timeStyle:'short' }); }
+  catch(e){ return new Date(ts).toLocaleString(); }
+}
+
+function buildSessionSnapshot(){
+  return {
+    schema: SESSION_SCHEMA,
+    savedAt: Date.now(),
+    fieldNames: [...fieldNames],
+    expectedYear: expectedYearInput.value,
+    rows: results.map(r => ({
+      fileName: r.fileName,
+      size: (r.file && r.file.size != null) ? r.file.size : (r.size != null ? r.size : null),
+      hash: r.hash || null,
+      data: r.data || null,
+      error: r.error || null
+    }))
+  };
+}
+
+async function saveSessionNow(){
+  if(!autosaveOn || results.length === 0) return;
+  try{
+    await storageSet(buildSessionSnapshot());
+    const where = storageBackend === 'ls' ? 'التخزين المحلي' : 'قاعدة بيانات المتصفح';
+    setSaveStatus(`💾 محفوظ تلقائياً (${results.length} ملف) — ${timeLabel(Date.now())} · ${where}`, 'saved');
+    clearSessionBtn.style.display = 'inline-block';
+  }catch(e){
+    autosaveOn = false;
+    setSaveStatus(`⚠️ تعذّر الحفظ التلقائي (${e.name === 'QuotaExceededError' ? 'الحصة ممتلئة' : e.message}) — صدّر إلى Excel قبل إغلاق الصفحة.`, 'warn');
+  }
+}
+
+function scheduleSave(){
+  if(!autosaveOn) return;
+  if(saveTimer) return;
+  saveTimer = setTimeout(()=>{ saveTimer = null; saveSessionNow(); }, 1200);
+}
+
+function restoreSession(snap){
+  fieldNames = Array.isArray(snap.fieldNames) ? [...snap.fieldNames] : [];
+  if(fieldNames.length) fieldsInput.value = fieldNames.join(', ');
+  if(snap.expectedYear) expectedYearInput.value = snap.expectedYear;
+  results = (snap.rows || []).map(r => ({
+    fileName: r.fileName,
+    size: r.size != null ? r.size : null,
+    file: null,                 // يُعاد ربطه عند اختيار المجلد نفسه
+    processing: false,
+    data: r.data || null,
+    error: r.error || null,
+    hash: r.hash || null
+  }));
+  restoreBanner.style.display = 'none';
+  renderTable();
+  renderDashboard();
+  const missing = results.filter(r => !r.file).length;
+  relinkNote.style.display = 'block';
+  const needsKey = !apiKeyInput.value.trim();
+  relinkNote.innerHTML = `🔗 استُعيدت <b>${results.length}</b> نتيجة. الملفات نفسها غير محمّلة (${missing}) — ` +
+    `اختر <b>المجلد نفسه</b> من الخطوة 2 لإعادة تفعيل المعاينة وإعادة المحاولة. التصدير والفحوص تعمل الآن دون ذلك.` +
+    (needsKey ? `<br>🔑 ولمتابعة الاستخراج أعد إدخال مفتاح API في الخطوة 1 (لا يُحفظ تلقائياً لأسباب أمنية).` : '');
+  setSaveStatus(`💾 جلسة مستعادة (${results.length} ملف) — حُفظت في ${timeLabel(snap.savedAt)}`, 'saved');
+  clearSessionBtn.style.display = 'inline-block';
+  updateResumeButton();
+}
+
+function showRestoreBanner(snap){
+  const n = (snap.rows || []).length;
+  const done = (snap.rows || []).filter(r => r.data && !r.error).length;
+  restoreBanner.className = 'restore-banner';
+  restoreBanner.style.display = 'block';
+  restoreBanner.innerHTML =
+    `📂 <b>وُجدت جلسة سابقة محفوظة</b> — ${n} ملف (${done} مكتمل)، حُفظت في ${escapeHtml(timeLabel(snap.savedAt))}.<br>` +
+    `يمكنك استعادتها والمتابعة من حيث توقفت، أو تجاهلها والبدء من جديد.` +
+    `<div class="restore-actions">
+       <button class="btn-primary" id="doRestoreBtn">↩️ استعادة الجلسة</button>
+       <button class="btn-danger" id="discardRestoreBtn">🗑 تجاهل وحذف</button>
+     </div>`;
+  document.getElementById('doRestoreBtn').addEventListener('click', ()=> restoreSession(snap));
+  document.getElementById('discardRestoreBtn').addEventListener('click', async ()=>{
+    await storageClear();
+    restoreBanner.style.display = 'none';
+    setSaveStatus('💾 الحفظ التلقائي جاهز — حُذفت الجلسة السابقة.');
+  });
+}
+
+// إعادة ربط الملفات بعد الاستعادة: مطابقة بالاسم والحجم
+function relinkFiles(){
+  const orphan = results.filter(r => !r.file);
+  if(orphan.length === 0) return 0;
+  const byNameSize = new Map(), byName = new Map();
+  selectedFiles.forEach(f => {
+    byNameSize.set(`${f.name}|${f.size}`, f);
+    if(!byName.has(f.name)) byName.set(f.name, f);
+  });
+  let n = 0;
+  orphan.forEach(r => {
+    const f = byNameSize.get(`${r.fileName}|${r.size}`) || byName.get(r.fileName);
+    if(f){ r.file = f; if(r.size == null) r.size = f.size; n++; }
+  });
+  if(n > 0){
+    const left = results.filter(r => !r.file).length;
+    relinkNote.style.display = 'block';
+    relinkNote.innerHTML = `✅ أُعيد ربط <b>${n}</b> ملف` + (left ? ` — ولا يزال ${left} بلا ملف مطابق في هذا المجلد.` : ' — كل الملفات مرتبطة الآن.');
+    renderTable();
+  }
+  updateResumeButton();
+  return n;
+}
+
+clearSessionBtn.addEventListener('click', async ()=>{
+  if(!confirm('حذف الجلسة المحفوظة؟ لن يؤثر ذلك على الجدول المعروض الآن، لكن إعادة تحميل الصفحة ستفقده.')) return;
+  await storageClear();
+  clearSessionBtn.style.display = 'none';
+  setSaveStatus('💾 حُذفت الجلسة المحفوظة. الحفظ التلقائي سيبدأ من جديد عند أول معالجة.');
+});
+
+// تحذير عند إغلاق الصفحة أثناء المعالجة أو قبل اكتمال الحفظ
+window.addEventListener('beforeunload', (e)=>{
+  if(isRunning || saveTimer){
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
+  }
+});
+
+storageGet().then(snap => {
+  if(snap && snap.schema === SESSION_SCHEMA && snap.rows && snap.rows.length){
+    showRestoreBanner(snap);
+    setSaveStatus(`📂 توجد جلسة محفوظة (${snap.rows.length} ملف) — اختر استعادتها أعلاه.`);
+    clearSessionBtn.style.display = 'inline-block';
+  }
+}).catch(()=>{
+  autosaveOn = false;
+  setSaveStatus('⚠️ تخزين المتصفح غير متاح هنا — لن يُحفظ شيء تلقائياً. صدّر إلى Excel أولاً بأول.', 'warn');
+});
+/* ================== نهاية الحفظ التلقائي ================== */
+
 const SUPPORTED_IMG = ['image/jpeg','image/png','image/webp','image/gif'];
 const SUPPORTED_PDF = ['application/pdf'];
 
@@ -461,6 +711,7 @@ folderInput.addEventListener('change', (e)=>{
   const skipped = all.length - selectedFiles.length;
   fileListInfo.innerHTML = `تم العثور على <span>${selectedFiles.length}</span> ملف مدعوم (صور/PDF)` +
     (skipped > 0 ? ` — تم تجاهل ${skipped} ملف غير مدعوم.` : '');
+  relinkFiles();   // بعد استعادة جلسة: يربط الملفات بنتائجها المحفوظة
 });
 
 function fileToBase64(file){
@@ -1392,7 +1643,10 @@ function renderTable(){
 
   results.forEach((r, idx) => {
     const docType = r.data && r.data[DOC_TYPE_FIELD];
-    html += `<tr><td>${escapeHtml(r.fileName)}<br><button class="btn-outline preview-btn" data-idx="${idx}">👁 عرض الملف</button></td><td>${docBadgeHtml(docType)}</td>`;
+    const previewBtn = r.file
+      ? `<button class="btn-outline preview-btn" data-idx="${idx}">👁 عرض الملف</button>`
+      : `<button class="btn-outline preview-btn" data-idx="${idx}" title="الملف غير محمّل — اختر المجلد نفسه من الخطوة 2" style="opacity:.6;">🔗 غير مرتبط</button>`;
+    html += `<tr><td>${escapeHtml(r.fileName)}<br>${previewBtn}</td><td>${docBadgeHtml(docType)}</td>`;
     html += `<td class="verdict-col">${computedBadgeHtml(r.data && r.data[VERDICT_FIELD])}</td>`;
 
     fieldNames.forEach(f => {
@@ -1445,6 +1699,7 @@ function renderTable(){
       if(String(row.data[field] == null ? '' : row.data[field]) === newVal) return;
       row.data[field] = newVal;
       renderTable();
+      scheduleSave();   // التعديلات اليدوية تُحفظ أيضاً
     });
   });
 
@@ -1457,6 +1712,7 @@ function renderTable(){
       const idx = parseInt(btn.dataset.idx);
       const r = results[idx];
       if(r && r.file) openPreview(r.file);
+      else alert('الملف نفسه غير محمّل (جلسة مستعادة). اختر المجلد نفسه من الخطوة 2 لإعادة ربط الملفات.');
     });
   });
 }
@@ -1465,7 +1721,11 @@ async function retrySingleFile(idx){
   const key = apiKeyInput.value.trim();
   if(!key){ alert('الرجاء إدخال مفتاح OpenRouter API أولاً.'); return; }
   const r = results[idx];
-  if(!r || !r.file) return;
+  if(!r) return;
+  if(!r.file){
+    alert('الملف نفسه غير محمّل (جلسة مستعادة). اختر المجلد نفسه من الخطوة 2 لإعادة ربط الملفات ثم أعد المحاولة.');
+    return;
+  }
 
   r.processing = true;
   r.error = null;
@@ -1474,13 +1734,14 @@ async function retrySingleFile(idx){
   try{
     const data = await extractFromFile(r.file, fieldNames, null);
     const hash = await computeFileHash(r.file);
-    results[idx] = { fileName: r.fileName, file: r.file, processing: false, data, error: null, hash };
+    results[idx] = { fileName: r.fileName, size: r.file.size, file: r.file, processing: false, data, error: null, hash };
   }catch(err){
     const hash = r.hash || await computeFileHash(r.file).catch(() => null);
-    results[idx] = { fileName: r.fileName, file: r.file, processing: false, data: r.data || {}, error: err.name === 'AbortError' ? 'تم إلغاء الطلب' : err.message, hash };
+    results[idx] = { fileName: r.fileName, size: r.file.size, file: r.file, processing: false, data: r.data || {}, error: err.name === 'AbortError' ? 'تم إلغاء الطلب' : err.message, hash };
   }
   renderTable();
   renderDashboard();
+  saveSessionNow();
 }
 
 let isCancelled = false;
@@ -1502,33 +1763,55 @@ function resumeFromPause(){
   pauseResolvers = [];
 }
 
-runBtn.addEventListener('click', async ()=>{
-  const key = apiKeyInput.value.trim();
-  if(!key){ alert('الرجاء إدخال مفتاح OpenRouter API أولاً.'); return; }
-  if(!modelNameInput.value.trim()){ alert('الرجاء إدخال اسم الموديل (model slug).'); return; }
-  if(selectedFiles.length === 0){ alert('الرجاء اختيار مجلد يحتوي ملفات مدعومة.'); return; }
-
+function readFieldNames(){
   // إصلاح: كان الفصل بالفاصلة اللاتينية فقط — الفاصلة العربية "،" أو سطر جديد كانت تدمج الحقول في حقل واحد.
   // وأُضيف حذف التكرار لتفادي أعمدة مكرّرة تُفسد الجدول والتصدير.
-  fieldNames = [...new Set(
+  return [...new Set(
     fieldsInput.value
       .split(/[,،\n;؛]/)
       .map(s => s.trim())
       .filter(f => Boolean(f) && f !== DOC_TYPE_FIELD && f !== VERDICT_FIELD)
   )];
-  if(fieldNames.length === 0){ alert('الرجاء إدخال حقل واحد على الأقل.'); return; }
+}
 
+// صفٌّ يحتاج معالجة: لم يُستخرج له شيء بعد، أو فشل، أو أُلغي
+function isRowIncomplete(r){
+  if(!r) return false;
+  if(r.error) return true;
+  if(!r.data) return true;
+  return !Object.keys(r.data).some(k => k !== DOC_TYPE_FIELD && normalizeValue(r.data[k]));
+}
+
+function getIncompleteIndices(){
+  const out = [];
+  results.forEach((r, i)=>{ if(isRowIncomplete(r) && r.file) out.push(i); });
+  return out;
+}
+
+function updateResumeButton(){
+  if(isRunning || results.length === 0){ resumeBtn.style.display = 'none'; return; }
+  const pending = getIncompleteIndices().length;
+  const blocked = results.filter(r => isRowIncomplete(r) && !r.file).length;
+  if(pending > 0){
+    resumeBtn.style.display = 'inline-block';
+    resumeBtn.textContent = `▶️ استكمال غير المكتملة (${pending})`;
+    resumeBtn.title = blocked ? `${blocked} صفاً آخر بلا ملف مرتبط — أعد اختيار المجلد.` : '';
+  } else if(blocked > 0){
+    resumeBtn.style.display = 'inline-block';
+    resumeBtn.textContent = `🔗 ${blocked} غير مكتمل يحتاج ربط الملفات`;
+    resumeBtn.title = 'اختر المجلد نفسه من الخطوة 2.';
+  } else {
+    resumeBtn.style.display = 'none';
+  }
+}
+
+// نواة المعالجة — يستخدمها «بدء الاستخراج» و«استكمال غير المكتملة» معاً
+async function processQueue(queue, label){
   const concurrency = parseInt(document.getElementById('concurrencySelect').value, 10) || 3;
+  const total = queue.length;
 
-  results = selectedFiles.map(f => ({
-    fileName: f.name,
-    file: f,
-    processing: false,
-    data: null,
-    error: null,
-    hash: null
-  }));
-
+  restoreBanner.style.display = 'none';
+  isRunning = true;
   isCancelled = false;
   isPaused = false;
   pauseResolvers = [];
@@ -1539,6 +1822,7 @@ runBtn.addEventListener('click', async ()=>{
   dashboardCard.style.display = 'none';
   runBtn.disabled = true;
   runBtn.style.display = 'none';
+  resumeBtn.style.display = 'none';
   pauseBtn.style.display = 'inline-block';
   pauseBtn.textContent = '⏸ إيقاف مؤقت';
   stopBtn.style.display = 'inline-block';
@@ -1546,24 +1830,26 @@ runBtn.addEventListener('click', async ()=>{
   stopBtn.textContent = '⏹ إيقاف العملية';
   progressWrap.style.display = 'block';
   progressBar.style.width = '0%';
-  progressCount.textContent = `0/${selectedFiles.length}`;
-  progressLabel.textContent = 'جارٍ معالجة الملفات...';
+  progressCount.textContent = `0/${total}`;
+  progressLabel.textContent = label;
 
   renderTable();
 
-  const workerCount = Math.min(concurrency, selectedFiles.length);
+  const workerCount = Math.min(concurrency, total);
   const workers = [];
 
   for(let w = 0; w < workerCount; w++){
     workers.push((async () => {
-      while(nextIndex < selectedFiles.length && !isCancelled){
+      while(nextIndex < total && !isCancelled){
         await waitIfPaused();
         if(isCancelled) break;
 
-        const i = nextIndex++;
-        if(i >= selectedFiles.length) break;
+        const qi = nextIndex++;
+        if(qi >= total) break;
+        const i = queue[qi];
 
-        const file = selectedFiles[i];
+        const file = results[i].file;
+        if(!file){ continue; }
         results[i].processing = true;
         requestRender();
 
@@ -1575,11 +1861,12 @@ runBtn.addEventListener('click', async ()=>{
         try{
           const data = await extractFromFile(file, fieldNames, controller.signal);
           const hash = await computeFileHash(file);
-          results[i] = { fileName: file.name, file, processing: false, data, error: null, hash };
+          results[i] = { fileName: file.name, size: file.size, file, processing: false, data, error: null, hash };
         }catch(err){
           const hash = await computeFileHash(file).catch(() => null);
           results[i] = {
             fileName: file.name,
+            size: file.size,
             file,
             processing: false,
             data: results[i].data || {},
@@ -1591,10 +1878,11 @@ runBtn.addEventListener('click', async ()=>{
         }
 
         completedCount++;
-        progressBar.style.width = `${Math.round((completedCount / selectedFiles.length) * 100)}%`;
-        progressCount.textContent = `${completedCount}/${selectedFiles.length}`;
-        progressLabel.textContent = isPaused ? 'موقوف مؤقتاً' : `تمت معالجة ${completedCount} من أصل ${selectedFiles.length}`;
+        progressBar.style.width = `${Math.round((completedCount / total) * 100)}%`;
+        progressCount.textContent = `${completedCount}/${total}`;
+        progressLabel.textContent = isPaused ? 'موقوف مؤقتاً' : `تمت معالجة ${completedCount} من أصل ${total}`;
         requestRender();
+        scheduleSave();   // حفظ تلقائي بعد كل ملف — انهيار أو إغلاق لا يفقد ما أُنجز
       }
     })());
   }
@@ -1618,10 +1906,62 @@ runBtn.addEventListener('click', async ()=>{
     progressLabel.textContent = `تم إيقاف العملية (تمت معالجة ${completedCount} ملف)`;
   }
 
+  isRunning = false;
+  if(saveTimer){ clearTimeout(saveTimer); saveTimer = null; }
+  await saveSessionNow();
+
   runBtn.disabled = false;
   runBtn.style.display = 'inline-block';
   pauseBtn.style.display = 'none';
   stopBtn.style.display = 'none';
+  updateResumeButton();
+}
+
+runBtn.addEventListener('click', async ()=>{
+  const key = apiKeyInput.value.trim();
+  if(!key){ alert('الرجاء إدخال مفتاح OpenRouter API أولاً.'); return; }
+  if(!modelNameInput.value.trim()){ alert('الرجاء إدخال اسم الموديل (model slug).'); return; }
+  if(selectedFiles.length === 0){ alert('الرجاء اختيار مجلد يحتوي ملفات مدعومة.'); return; }
+
+  fieldNames = readFieldNames();
+  if(fieldNames.length === 0){ alert('الرجاء إدخال حقل واحد على الأقل.'); return; }
+
+  const hasWork = results.some(r => r.data || r.error);
+  if(hasWork && !confirm('سيبدأ استخراج جديد لكل الملفات المختارة وسيُستبدل الجدول الحالي (وستُدفع تكلفة جديدة).\n\nإن كنت تريد إكمال ما لم يكتمل فقط، اضغط «إلغاء» ثم استخدم زر «استكمال غير المكتملة».')) return;
+
+  results = selectedFiles.map(f => ({
+    fileName: f.name,
+    size: f.size,
+    file: f,
+    processing: false,
+    data: null,
+    error: null,
+    hash: null
+  }));
+
+  relinkNote.style.display = 'none';
+  await processQueue(results.map((_, i) => i), 'جارٍ معالجة الملفات...');
+});
+
+resumeBtn.addEventListener('click', async ()=>{
+  const key = apiKeyInput.value.trim();
+  if(!key){
+    alert('الرجاء إدخال مفتاح OpenRouter API أولاً (الخطوة 1).\n\nالمفتاح لا يُحفظ مع الجلسة لأسباب أمنية، فبعد إعادة تحميل الصفحة يجب إدخاله من جديد — ما لم تفعّل خيار «تذكّر المفتاح».');
+    apiKeyInput.focus();
+    apiKeyInput.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+  if(fieldNames.length === 0) fieldNames = readFieldNames();
+
+  const queue = getIncompleteIndices();
+  if(queue.length === 0){
+    const blocked = results.filter(r => isRowIncomplete(r) && !r.file).length;
+    alert(blocked
+      ? `${blocked} صفاً غير مكتمل لكن ملفاته غير مرتبطة. اختر المجلد نفسه من الخطوة 2 أولاً.`
+      : 'لا توجد صفوف غير مكتملة.');
+    return;
+  }
+  await processQueue(queue, `جارٍ استكمال ${queue.length} ملف غير مكتمل...`);
 });
 
 pauseBtn.addEventListener('click', ()=>{
