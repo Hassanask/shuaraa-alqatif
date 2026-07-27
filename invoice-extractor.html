@@ -878,12 +878,15 @@ function normalizeExtracted(obj, fields){
   return out;
 }
 
-async function fetchWithRetry(url, options, maxRetries = 5) {
+// onRetry اختياري: يسمح للواجهة بإظهار أن الانتظار سببه إعادة محاولة، لا تجمّد.
+// (المهلة الكاملة تبلغ ~31 ثانية مع 5 محاولات، وكانت تمر بلا أي مؤشر للمستخدم.)
+async function fetchWithRetry(url, options, maxRetries = 5, onRetry) {
   let delay = 1000;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const response = await fetch(url, options);
       if ((response.status === 429 || response.status >= 500) && attempt < maxRetries && !options.signal?.aborted) {
+        if (onRetry) onRetry(attempt + 1, maxRetries, delay, `HTTP ${response.status}`);
         await new Promise(r => setTimeout(r, delay));
         delay *= 2;
         continue;
@@ -892,6 +895,7 @@ async function fetchWithRetry(url, options, maxRetries = 5) {
     } catch (err) {
       if (err.name === 'AbortError') throw err;
       if (attempt < maxRetries && !options.signal?.aborted) {
+        if (onRetry) onRetry(attempt + 1, maxRetries, delay, err.message);
         await new Promise(r => setTimeout(r, delay));
         delay *= 2;
         continue;
@@ -2014,35 +2018,290 @@ function simpleMarkdownToHtml(md){
   return html;
 }
 
-// توفير توكنز بلا فقد معلومات: حذف المفاتيح الفارغة بدل إرسال "": "" لكل حقل ناقص في كل صف.
-// وعند الجداول الضخمة يُكتفى بالأعمدة الجوهرية حتى لا يتجاوز الطلب حدود سياق النموذج ويفشل.
-const SNAPSHOT_SOFT_LIMIT = 120000; // بالأحرف
+/* ============ التحليل الإحصائي المحلي ============
+   كل رقم في التقرير يُحسب هنا بدقة تامة بلا أي توكن. النموذج لا يحسب شيئاً —
+   يتسلّم الحقائق جاهزة ويقتصر دوره على ما يجيده فعلاً: التشابه الدلالي في
+   الأسماء، والترتيب حسب الأولوية، والصياغة. سبب ذلك أن نماذج اللغة غير موثوقة
+   في العدّ والمتوسطات والقيم الشاذة على مئات الصفوف. */
 
-function buildTableSnapshot(){
+function quantile(sortedAsc, q){
+  if(!sortedAsc.length) return null;
+  const pos = (sortedAsc.length - 1) * q;
+  const base = Math.floor(pos);
+  const rest = pos - base;
+  const next = sortedAsc[base + 1];
+  return next !== undefined ? sortedAsc[base] + rest * (next - sortedAsc[base]) : sortedAsc[base];
+}
+
+function round2(n){ return n == null ? null : Math.round(n * 100) / 100; }
+
+// المبلغ والتاريخ المعتمدان لكل صف حسب نوع المستند (نفس منطق اللوحة)
+function analysisAccessors(){
+  const invoiceDateField  = fieldNames.find(f => f.includes('تاريخ') && f.includes('الفاتورة'));
+  const transferDateField = fieldNames.find(f => f.includes('تاريخ') && f.includes('التحويل'));
+  const invoiceAmtField   = fieldNames.find(f => f.includes('المبلغ') && f.includes('الإجمالي')) || fieldNames.find(f => f.includes('المبلغ'));
+  const transferAmtField  = fieldNames.find(f => f.includes('مبلغ') && f.includes('التحويل'));
+  const vendorField       = fieldNames.find(f => f.includes('اسم') && f.includes('البائع'));
+  return {
+    vendorField,
+    amountOf(r){
+      if(!r.data) return null;
+      const t = r.data[DOC_TYPE_FIELD];
+      if(t === 'تحويل بنكي' && transferAmtField) return parseAmountNumber(r.data[transferAmtField]);
+      return parseAmountNumber(r.data[invoiceAmtField]);
+    },
+    dateOf(r){
+      if(!r.data) return null;
+      const t = r.data[DOC_TYPE_FIELD];
+      const raw = (t === 'تحويل بنكي' && transferDateField) ? r.data[transferDateField]
+                : (invoiceDateField ? r.data[invoiceDateField] : null);
+      return raw ? String(raw).slice(0,10) : null;
+    }
+  };
+}
+
+function computeLocalStats(){
+  const acc = analysisAccessors();
   const indicatorKeys = getIndicatorKeys();
+  const notes = [];
 
-  const full = results.map(r => {
-    const row = { 'اسم الملف': r.fileName, 'نوع المستند': (r.data && r.data[DOC_TYPE_FIELD]) || '' };
-    fieldNames.forEach(f => { row[f] = (r.data && r.data[f] != null) ? r.data[f] : ''; });
-    row[VERDICT_FIELD] = (r.data && r.data[VERDICT_FIELD]) || '';
-    indicatorKeys.forEach(k => { row[k] = (r.data && r.data[k]) || ''; });
-    Object.keys(row).forEach(k => { if(row[k] === '' || row[k] == null) delete row[k]; });
-    return row;
+  const total = results.length;
+  const failed = results.filter(r => r.error).length;
+  const invoices = results.filter(r => r.data && r.data[DOC_TYPE_FIELD] === 'فاتورة').length;
+  const transfers = results.filter(r => r.data && r.data[DOC_TYPE_FIELD] === 'تحويل بنكي').length;
+
+  // توزيع الخطورة وتكرار المؤشرات
+  const risk = { 'طبيعي':0, 'متوسط':0, 'خطير':0 };
+  const indicatorCounts = {};
+  results.forEach(r => {
+    const { level, triggered } = classifyRisk(r);
+    risk[level]++;
+    triggered.forEach(k => {
+      const label = getIndicatorLabel(k);
+      indicatorCounts[label] = (indicatorCounts[label] || 0) + 1;
+    });
   });
+  const flagged = risk['متوسط'] + risk['خطير'];
 
-  if(JSON.stringify(full).length <= SNAPSHOT_SOFT_LIMIT) return full;
-
-  // نسخة مضغوطة: الحقول التحليلية الأساسية + المؤشرات المُفعّلة فقط
-  const core = fieldNames.filter(f =>
-    f.includes('البائع') || f.includes('تاريخ') || f.includes('المبلغ') || f.includes('مبلغ') || f.includes('رقم')
-  );
-  return results.map(r => {
-    const row = { 'اسم الملف': r.fileName, 'نوع المستند': (r.data && r.data[DOC_TYPE_FIELD]) || '' };
-    core.forEach(f => { row[f] = (r.data && r.data[f] != null) ? r.data[f] : ''; });
-    indicatorKeys.forEach(k => { if(isBadForField(k, r.data && r.data[k])) row[k] = r.data[k]; });
-    Object.keys(row).forEach(k => { if(row[k] === '' || row[k] == null) delete row[k]; });
-    return row;
+  // المبالغ
+  const withAmount = [];
+  results.forEach(r => {
+    const a = acc.amountOf(r);
+    if(a != null && isFinite(a)) withAmount.push({ file: r.fileName, amount: a, date: acc.dateOf(r), vendor: acc.vendorField ? normalizeValue(r.data && r.data[acc.vendorField]) : '' });
   });
+  const amounts = withAmount.map(x => x.amount).sort((a,b)=>a-b);
+  const n = amounts.length;
+  const sum = amounts.reduce((s,x)=>s+x, 0);
+  const q1 = quantile(amounts, 0.25), q2 = quantile(amounts, 0.5), q3 = quantile(amounts, 0.75);
+  const iqr = (q1 != null && q3 != null) ? q3 - q1 : null;
+
+  // القيم الشاذة بطريقة الربيعيات (لا تتأثر بالقيم المتطرفة كما يتأثر الانحراف المعياري)
+  let outliers = [];
+  if(iqr != null && iqr > 0){
+    const lo = q1 - 1.5 * iqr, hi = q3 + 1.5 * iqr;
+    outliers = withAmount.filter(x => x.amount < lo || x.amount > hi)
+      .sort((a,b)=> Math.abs(b.amount - q2) - Math.abs(a.amount - q2))
+      .slice(0, 12)
+      .map(x => ({ 'الملف': x.file, 'المبلغ': round2(x.amount), 'البائع': x.vendor || undefined, 'الاتجاه': x.amount > hi ? 'مرتفع شاذ' : 'منخفض شاذ' }));
+  } else if(n > 0){
+    notes.push('تعذّر حساب القيم الشاذة: المدى الربيعي صفر (المبالغ متطابقة تقريباً).');
+  }
+
+  // المبالغ المستديرة — مؤشر تدقيقي كلاسيكي على الفواتير المُصطنعة
+  const round1000 = withAmount.filter(x => x.amount >= 1000 && x.amount % 1000 === 0);
+  const round100  = withAmount.filter(x => x.amount >= 100 && x.amount % 100 === 0);
+
+  // قانون بنفورد على الرقم الأول
+  let benford = null;
+  const leading = [];
+  withAmount.forEach(x => {
+    const m = String(Math.abs(x.amount)).replace(/[^0-9]/g,'').replace(/^0+/,'');
+    if(m.length) leading.push(+m[0]);
+  });
+  if(leading.length){
+    const observed = {}, expected = {}, deviation = {};
+    for(let d=1; d<=9; d++){
+      const c = leading.filter(x => x === d).length;
+      observed[d] = c;
+      expected[d] = round2(Math.log10(1 + 1/d) * leading.length);
+      deviation[d] = round2(c - expected[d]);
+    }
+    let worst = 1;
+    for(let d=2; d<=9; d++) if(Math.abs(deviation[d]) > Math.abs(deviation[worst])) worst = d;
+    benford = {
+      'حجم العينة': leading.length,
+      'المرصود': observed,
+      'المتوقع حسب بنفورد': expected,
+      'أكبر انحراف': `الرقم ${worst}: ${deviation[worst] > 0 ? '+' : ''}${deviation[worst]} عن المتوقع`,
+      'معتبر إحصائياً': leading.length >= 30
+    };
+    if(leading.length < 30) notes.push(`عينة بنفورد صغيرة (${leading.length} مبلغ) — لا يصح بناء استنتاج عليها، ذُكرت للعلم فقط.`);
+  }
+
+  // التواريخ
+  const dates = withAmount.map(x => x.date).filter(Boolean).sort();
+  const dailyTotals = {};
+  withAmount.forEach(x => { if(x.date) dailyTotals[x.date] = (dailyTotals[x.date] || 0) + x.amount; });
+  let busiestDay = null, busiestVal = -Infinity;
+  Object.entries(dailyTotals).forEach(([d,v]) => { if(v > busiestVal){ busiestVal = v; busiestDay = d; } });
+
+  const today = new Date().toISOString().slice(0,10);
+  const futureDated = withAmount.filter(x => x.date && x.date > today).map(x => x.file).slice(0, 10);
+
+  if(!acc.vendorField) notes.push('لا يوجد حقل "اسم البائع" في القائمة — تعذّر تحليل البائعين.');
+  if(n === 0) notes.push('لم يُعثر على أي مبلغ صالح — كل التحليل المالي معطّل.');
+
+  return {
+    'عدد الملفات': total,
+    'فواتير': invoices,
+    'تحويلات بنكية': transfers,
+    'فشل استخراجها': failed,
+    'فيها مؤشر اشتباه واحد على الأقل': flagged,
+    'توزيع الخطورة': risk,
+    'تكرار كل مؤشر': indicatorCounts,
+    'تحليل المبالغ': n === 0 ? 'لا توجد مبالغ صالحة' : {
+      'عدد المبالغ': n,
+      'المجموع': round2(sum),
+      'المتوسط': round2(sum / n),
+      'الوسيط': round2(q2),
+      'الأدنى': round2(amounts[0]),
+      'الأعلى': round2(amounts[n-1]),
+      'الربيع الأول': round2(q1),
+      'الربيع الثالث': round2(q3)
+    },
+    'قيم شاذة (طريقة الربيعيات)': outliers.length ? outliers : 'لا توجد',
+    'المبالغ المستديرة': {
+      'من مضاعفات 1000': round1000.length,
+      'من مضاعفات 100': round100.length,
+      'نسبة مضاعفات 1000': n ? Math.round(100 * round1000.length / n) + '%' : '—',
+      'أمثلة': round1000.slice(0,6).map(x => `${x.file}: ${round2(x.amount)}`)
+    },
+    'قانون بنفورد': benford || 'لا توجد بيانات',
+    'المدى الزمني': dates.length ? { 'من': dates[0], 'إلى': dates[dates.length-1] } : 'لا توجد تواريخ',
+    'أعلى يوم نشاطاً': busiestDay ? { 'اليوم': busiestDay, 'الإجمالي': round2(busiestVal) } : 'لا يوجد',
+    'فواتير بتاريخ مستقبلي': futureDated.length ? futureDated : 'لا توجد',
+    'ملاحظات على البيانات': notes.length ? notes : 'لا توجد'
+  };
+}
+
+// قائمة البائعين المميّزين — هذا ما يحتاجه النموذج لكشف التشابه في الأسماء،
+// بدل أن يمسح مئات الصفوف بنفسه.
+function buildVendorList(){
+  const acc = analysisAccessors();
+  if(!acc.vendorField) return [];
+  const map = new Map();
+  results.forEach(r => {
+    if(!r.data) return;
+    const v = normalizeValue(r.data[acc.vendorField]);
+    if(!v) return;
+    const amt = acc.amountOf(r) || 0;
+    const cur = map.get(v) || { 'البائع': v, 'عدد المستندات': 0, 'الإجمالي': 0 };
+    cur['عدد المستندات']++; cur['الإجمالي'] += amt;
+    map.set(v, cur);
+  });
+  return [...map.values()]
+    .map(v => ({ ...v, 'الإجمالي': round2(v['الإجمالي']) }))
+    .sort((a,b) => b['الإجمالي'] - a['الإجمالي']);
+}
+
+// تفاصيل الصفوف المُعلَّمة فقط — هي وحدها ما يحتاج النموذج قراءته سطراً سطراً
+const MAX_FLAGGED_DETAIL = 150;
+
+function buildFlaggedRows(){
+  const acc = analysisAccessors();
+  const indicatorKeys = getIndicatorKeys();
+  const rows = [];
+  results.forEach(r => {
+    if(!r.data) return;
+    const triggered = indicatorKeys.filter(k => isBadForField(k, r.data[k]));
+    if(triggered.length === 0) return;
+    rows.push({
+      'الملف': r.fileName,
+      'النوع': r.data[DOC_TYPE_FIELD] || '',
+      'البائع': acc.vendorField ? (normalizeValue(r.data[acc.vendorField]) || undefined) : undefined,
+      'التاريخ': acc.dateOf(r) || undefined,
+      'المبلغ': round2(acc.amountOf(r)) ?? undefined,
+      'المؤشرات': triggered.map(k => `${getIndicatorLabel(k)}: ${normalizeValue(r.data[k])}`)
+    });
+  });
+  rows.sort((a,b) => b['المؤشرات'].length - a['المؤشرات'].length);
+  return { rows: rows.slice(0, MAX_FLAGGED_DETAIL), truncated: Math.max(0, rows.length - MAX_FLAGGED_DETAIL) };
+}
+
+// كتلة الحقائق المحسوبة محلياً — تُعرض دائماً وأرقامها نهائية غير خاضعة لرأي النموذج
+function renderLocalFactsHtml(s){
+  const fmt = v => (typeof v === 'number') ? v.toLocaleString('ar') : escapeHtml(String(v));
+  const amt = s['تحليل المبالغ'];
+  const risk = s['توزيع الخطورة'];
+
+  const stat = (label, val) =>
+    `<div style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-align:center;min-width:96px;flex:1;">
+       <div style="font-size:17px;font-weight:800;color:var(--accent-dark);">${fmt(val)}</div>
+       <div style="font-size:10px;color:var(--muted);margin-top:2px;">${escapeHtml(label)}</div>
+     </div>`;
+
+  let html = `<div style="background:#f6f9f8;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:20px;">
+    <div style="font-weight:800;color:var(--accent-dark);margin-bottom:4px;">🧮 حقائق محسوبة محلياً</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
+      هذه الأرقام محسوبة حسابياً في متصفحك، وهي نهائية. ما يليها قراءة تحليلية من النموذج — إن خالفها فالصواب هنا.
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      ${stat('ملفات', s['عدد الملفات'])}
+      ${stat('فواتير', s['فواتير'])}
+      ${stat('تحويلات', s['تحويلات بنكية'])}
+      ${stat('🚩 مُعلَّمة', s['فيها مؤشر اشتباه واحد على الأقل'])}
+      ${stat('🔴 خطير', risk['خطير'])}
+      ${stat('🟠 متوسط', risk['متوسط'])}
+      ${s['فشل استخراجها'] ? stat('فشل', s['فشل استخراجها']) : ''}
+    </div>`;
+
+  if(typeof amt === 'object'){
+    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      ${stat('المجموع', amt['المجموع'])}
+      ${stat('المتوسط', amt['المتوسط'])}
+      ${stat('الوسيط', amt['الوسيط'])}
+      ${stat('الأدنى', amt['الأدنى'])}
+      ${stat('الأعلى', amt['الأعلى'])}
+    </div>`;
+  }
+
+  const outliers = s['قيم شاذة (طريقة الربيعيات)'];
+  if(Array.isArray(outliers) && outliers.length){
+    html += `<div style="font-size:12px;margin-bottom:8px;"><b>قيم شاذة (${outliers.length}):</b> ` +
+      outliers.slice(0,6).map(o => `${escapeHtml(o['الملف'])} <span style="color:var(--danger);font-weight:700;">${fmt(o['المبلغ'])}</span>`).join(' · ') +
+      `</div>`;
+  }
+
+  const ind = s['تكرار كل مؤشر'];
+  const indEntries = Object.entries(ind || {}).sort((a,b)=>b[1]-a[1]);
+  if(indEntries.length){
+    html += `<div style="font-size:12px;margin-bottom:8px;"><b>تكرار المؤشرات:</b> ` +
+      indEntries.map(([k,v]) => `${escapeHtml(k)} (${v})`).join(' · ') + `</div>`;
+  }
+
+  const rounds = s['المبالغ المستديرة'];
+  if(rounds && rounds['من مضاعفات 1000']){
+    html += `<div style="font-size:12px;margin-bottom:8px;"><b>مبالغ مستديرة:</b> ${rounds['من مضاعفات 1000']} من مضاعفات 1000 (${escapeHtml(String(rounds['نسبة مضاعفات 1000']))})</div>`;
+  }
+
+  const b = s['قانون بنفورد'];
+  if(b && typeof b === 'object'){
+    html += `<div style="font-size:12px;margin-bottom:8px;"><b>بنفورد:</b> ${escapeHtml(String(b['أكبر انحراف']))} — عينة ${b['حجم العينة']}` +
+      (b['معتبر إحصائياً'] ? '' : ` <span style="color:var(--danger);">(أصغر من أن يُبنى عليها استنتاج)</span>`) + `</div>`;
+  }
+
+  const future = s['فواتير بتاريخ مستقبلي'];
+  if(Array.isArray(future) && future.length){
+    html += `<div style="font-size:12px;margin-bottom:8px;color:var(--danger);"><b>⚠️ تواريخ مستقبلية:</b> ${future.map(escapeHtml).join('، ')}</div>`;
+  }
+
+  const notes = s['ملاحظات على البيانات'];
+  if(Array.isArray(notes) && notes.length){
+    html += `<div style="font-size:11px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px;margin-top:8px;">` +
+      notes.map(x => '• ' + escapeHtml(x)).join('<br>') + `</div>`;
+  }
+
+  return html + `</div>`;
 }
 
 async function runAIOverview(){
@@ -2051,24 +2310,70 @@ async function runAIOverview(){
   if(results.length === 0) return;
 
   aiReportModal.style.display = 'flex';
-  aiReportBody.innerHTML = `<div class="report-loading"><div class="spinner"></div>جارٍ تحليل الجدول بالكامل...</div>`;
+  aiReportBody.innerHTML = `<div class="report-loading"><div class="spinner"></div>جارٍ الحساب المحلي ثم التحليل...</div>`;
 
-  const snapshot = buildTableSnapshot();
+  // 1) الحقائق تُحسب محلياً بدقة تامة  2) النموذج يفسّرها ولا يحسبها
+  const stats = computeLocalStats();
+  const vendors = buildVendorList();
+  const flagged = buildFlaggedRows();
   const model = modelNameInput.value.trim();
 
-  const prompt = `أنت محلل مالي خبير في مراجعة الفواتير والتحويلات البنكية واكتشاف التلاعب.
-سأعطيك بيانات مستخرجة مسبقاً من مجموعة فواتير/تحويلات بصيغة JSON.
+  // تُعرض الأرقام المحسوبة فوراً — يراها المستخدم حتى لو فشل النموذج أو خالفها
+  const factsHtml = renderLocalFactsHtml(stats);
+  aiReportBody.innerHTML = factsHtml +
+    `<div class="report-loading"><div class="spinner"></div>جارٍ إنشاء القراءة التحليلية...</div>`;
 
-مهمتك كتابة تقرير عربي بصيغة Markdown يتضمن
-الأقسام التالية:
-## نظرة عامة سريعة
+  const indicatorGlossary = getIndicatorKeys()
+    .map(k => `- ${getIndicatorLabel(k)}`)
+    .join('\n');
+
+  const coverage = [];
+  coverage.push(`أُرسلت تفاصيل الصفوف المُعلَّمة فقط (${flagged.rows.length} صفاً) — الصفوف السليمة لم تُرسل سطراً سطراً، بل مُلخّصة في الإحصاءات.`);
+  if(flagged.truncated > 0) coverage.push(`⚠️ حُذف ${flagged.truncated} صفاً مُعلَّماً إضافياً لضخامة الحجم — التقرير لا يغطيها.`);
+  if(vendors.length === 0) coverage.push('⚠️ لا توجد قائمة بائعين — تحليل تشابه الأسماء غير ممكن.');
+
+  const prompt = `أنت مدقق مالي خبير في كشف التلاعب بالفواتير والتحويلات البنكية.
+البيانات أدناه **محسوبة حسابياً بدقة تامة** من جدول مُستخرَج مسبقاً. مهمتك التفسير والترتيب والصياغة — لا الحساب.
+
+قيود إلزامية، خالفها يُفسد التقرير:
+1. لا تُعِد حساب أي رقم ولا تُقرّبه ولا تناقض الأرقام المُعطاة. انقلها كما هي.
+2. ممنوع منعاً باتاً ذكر أي رقم أو اسم ملف أو بائع غير وارد حرفياً في البيانات أدناه. لا تقدير ولا استقراء ولا أمثلة متخيّلة.
+3. كل ملاحظة أو اشتباه يجب أن يُذكر معه **اسم الملف** بين قوسين. ملاحظة بلا اسم ملف لا تُكتب أصلاً.
+4. المؤشرات المُعلَّمة محسوبة برمجياً بشكل حتمي وموثوق — ابنِ عليها ولا تُشكّك فيها ولا تُعِد تقييمها.
+5. إن لم تكفِ البيانات لقسم ما، اكتب فيه "لا توجد بيانات كافية" ولا تملأه بكلام إنشائي عام.
+6. لا تَعُدّ ولا تُقدّر أعداداً بنفسك؛ كل الأعداد التي تحتاجها موجودة في "الإحصاءات".
+
+معاني المؤشرات المستخدمة:
+${indicatorGlossary}
+
+اكتب تقريراً عربياً موجزاً بصيغة Markdown بهذه الأقسام حصراً:
+
+## خلاصة تنفيذية
+ثلاث إلى خمس نقاط لأهم ما يستحق انتباه المدقق، مستندة إلى الأرقام المُعطاة.
+
 ## تشابهات محتملة في أسماء البائعين
-## قيم مالية شاذة إحصائياً
-## أولويات المراجعة اليدوية
-## تنبيه على الحدود
+افحص قائمة البائعين وحدّد الأسماء التي يُرجَّح أنها **لكيان واحد** (اختلاف إملائي، كلمة زائدة أو ناقصة، اختصار). هذا أهم قسم لأن الفحوص البرمجية تطابق الأسماء حرفياً فتفوتها هذه الحالات. اذكر لكل مجموعة الأسماء وعدد مستنداتها. إن لم تجد تشابهاً واضحاً فقل ذلك صراحة.
 
-البيانات:
-${JSON.stringify(snapshot)}`;
+## قراءة المؤشرات والقيم الشاذة
+فسّر ما تعنيه المؤشرات المتكررة والقيم الشاذة المُعطاة: ما النمط الذي تشير إليه؟ استشهد بأسماء الملفات.
+
+## أولويات المراجعة اليدوية
+رتّب الملفات الأجدر بالمراجعة أولاً مع سبب موجز لكل ملف. اعتمد على عدد المؤشرات وخطورتها.
+
+## حدود هذا التحليل
+اذكر صراحةً ما لم يُفحص وما لا يصح الاستنتاج منه، مستنداً إلى "نطاق البيانات المُرسلة" و"ملاحظات على البيانات" أدناه. نبّه أن الاستخراج تم بنموذج رؤية ولم يُتحقق منه يدوياً.
+
+=== الإحصاءات (محسوبة محلياً — نهائية) ===
+${JSON.stringify(stats)}
+
+=== البائعون المميّزون ===
+${JSON.stringify(vendors)}
+
+=== الصفوف المُعلَّمة بمؤشرات ===
+${JSON.stringify(flagged.rows)}
+
+=== نطاق البيانات المُرسلة ===
+${JSON.stringify(coverage)}`;
 
   try{
     const response = await fetchWithRetry("https://openrouter.ai/api/v1/chat/completions", {
@@ -2079,9 +2384,15 @@ ${JSON.stringify(snapshot)}`;
       },
       body: JSON.stringify({
         model: model,
-        max_tokens: 3000,
+        max_tokens: 3500,
+        temperature: 0,          // تقرير تدقيقي يجب أن يتكرر بنفس النتيجة على نفس البيانات
         messages: [{ role: "user", content: prompt }]
       })
+    }, 5, (attempt, max, delay, why)=>{
+      const spinner = aiReportBody.querySelector('.report-loading');
+      if(spinner){
+        spinner.innerHTML = `<div class="spinner"></div>تعذّر الاتصال (${escapeHtml(String(why))}) — إعادة المحاولة ${attempt} من ${max} بعد ${Math.round(delay/1000)} ثانية...`;
+      }
     });
 
     if(!response.ok){
@@ -2092,7 +2403,8 @@ ${JSON.stringify(snapshot)}`;
     const data = await response.json();
     if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
-    const msg = data.choices && data.choices[0] && data.choices[0].message;
+    const choice = data.choices && data.choices[0];
+    const msg = choice && choice.message;
     let text = '';
     if(msg){
       if(typeof msg.content === 'string') text = msg.content;
@@ -2100,9 +2412,14 @@ ${JSON.stringify(snapshot)}`;
     }
     if(!text.trim()) throw new Error('لم يُرجع الموديل نصاً');
 
-    aiReportBody.innerHTML = simpleMarkdownToHtml(text);
+    // إصلاح: التقرير الطويل كان يُبتر بصمت عند بلوغ max_tokens فيبدو مكتملاً وهو ناقص
+    const truncated = choice && (choice.finish_reason === 'length' || choice.native_finish_reason === 'max_tokens');
+    aiReportBody.innerHTML = factsHtml + simpleMarkdownToHtml(text) +
+      (truncated ? `<div class="report-error" style="text-align:right;padding:12px;">⚠️ <b>تنبيه:</b> بُتر التقرير لبلوغه حد الطول — ما ورد أعلاه ناقص. قلّل عدد الملفات أو راجع الصفوف المُعلَّمة مباشرة من الجدول.</div>` : '');
   }catch(err){
-    aiReportBody.innerHTML = `<div class="report-error">⚠️ تعذّر إنشاء التقرير:<br>${err.message}</div>`;
+    aiReportBody.innerHTML = factsHtml +
+      `<div class="report-error">⚠️ تعذّر إنشاء القراءة التحليلية:<br>${escapeHtml(err.message)}<br>
+       <span style="font-size:12px;color:var(--muted);">الأرقام أعلاه محسوبة محلياً وصحيحة بصرف النظر عن ذلك.</span></div>`;
   }
 }
 
