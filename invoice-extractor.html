@@ -551,7 +551,12 @@ const PROMPT_RULES = `قواعد صارمة وتوجيهات دقيقة للمخ
 
 const PROMPT_HEADER = `أنت محلل مالي ورؤية بصرية خبير متخصص في مراجعة الفواتير والتحويلات البنكية واكتشاف التلاعب والتزوير.`;
 
+// ملاحظة تحسين: النسخة السابقة كانت تسرد أسماء الحقول مرتين (مرة للاستخراج ومرة في مخطط
+// JSON) وتكرر "القيمة أو null" لكل حقل — أي ~38% من البرومبت تكرار حرفي بلا أي معنى إضافي.
+// المخطط الآن يبيّن الشكل والترتيب بمرساتَي الحقل الأول والأخير فقط، والقاعدة 8 تتكفّل بنوع القيم.
 function buildPrompt(fields, compact){
+  const last = fields.length - 1;
+
   if(compact){
     // وضع توفير التوكنز: النموذج يرى أسماء الحقول العربية كاملة (فلا تفقد الدقة)،
     // لكنه يُرجع مفاتيح مختصرة بدل إعادة كتابة كل اسم حقل عربي طويل في الرد.
@@ -565,8 +570,8 @@ ${fields.map((f,i)=>`k${i+1} = ${f}`).join('\n')}
 
 ${PROMPT_RULES}
 
-أرجع الناتج بصيغة JSON صالحة حصراً بدون أي نص إضافي وبدون علامات Markdown، بالمفاتيح المختصرة فقط:
-{"t": "فاتورة أو تحويل بنكي أو أخرى", ${fields.map((f,i)=>`"k${i+1}": "القيمة أو null"`).join(', ')}}`;
+أرجع الناتج بصيغة JSON صالحة حصراً بدون أي نص إضافي وبدون علامات Markdown: كائن واحد مفاتيحه "t" ثم k1 حتى k${fields.length} بهذا الترتيب دون نقص، هكذا:
+{"t": "…", "k1": "…", …, "k${fields.length}": "…"}`;
   }
 
   return `${PROMPT_HEADER}
@@ -578,23 +583,47 @@ ${fields.join('، ')}
 
 ${PROMPT_RULES}
 
-أرجع الناتج بصيغة JSON صالحة حصراً بدون أي نص إضافي وبدون علامات Markdown:
-{"${DOC_TYPE_FIELD}": "فاتورة أو تحويل بنكي أو أخرى", ${fields.map(f=>`"${f}": "القيمة أو null"`).join(', ')}}`;
+أرجع الناتج بصيغة JSON صالحة حصراً بدون أي نص إضافي وبدون علامات Markdown: كائن واحد مفتاحه الأول "${DOC_TYPE_FIELD}" ثم أسماء الحقول أعلاه حرفياً بنفس الترتيب دون نقص، هكذا:
+{"${DOC_TYPE_FIELD}": "…", "${fields[0]}": "…", …, "${fields[last]}": "…"}`;
+}
+
+// تطبيع اسم المفتاح للمطابقة المتساهلة: يزيل التشكيل والتطويل ويوحّد الألف والياء والتاء المربوطة
+// ويحذف المسافات وعلامات الترقيم. الغرض: لو أعاد النموذج «رقم فاتورة» بدل «رقم الفاتورة»
+// أو أضاف تشكيلاً، لا نفقد الحقل ونعرضه فارغاً.
+function normalizeKey(k){
+  return String(k == null ? '' : k)
+    .replace(/[ً-ْـٰ]/g, '')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/[^\p{L}\p{N}]+/gu, '')
+    .toLowerCase();
 }
 
 // يقبل الردّ بالمفاتيح العربية الكاملة أو بالمفاتيح المختصرة (k1..kN / t) — أياً كان ما أرجعه النموذج.
 function normalizeExtracted(obj, fields){
   const out = {};
-  const rawType = (obj[DOC_TYPE_FIELD] !== undefined) ? obj[DOC_TYPE_FIELD]
-                : (obj.t !== undefined) ? obj.t
-                : (obj.type !== undefined) ? obj.type
-                : obj.doc_type;
-  out[DOC_TYPE_FIELD] = normalizeValue(rawType);
 
-  fields.forEach((f, i)=>{
-    const v = (obj[f] !== undefined) ? obj[f] : obj['k' + (i + 1)];
-    out[f] = normalizeValue(v);
+  // فهرس المفاتيح كما وردت من النموذج، بصيغتها المطبّعة
+  const byNorm = new Map();
+  Object.keys(obj || {}).forEach(k => {
+    const n = normalizeKey(k);
+    if(n && !byNorm.has(n)) byNorm.set(n, obj[k]);
   });
+
+  const pick = (...candidates) => {
+    for(const c of candidates){
+      if(c !== undefined && obj && obj[c] !== undefined) return obj[c];
+    }
+    for(const c of candidates){
+      const n = normalizeKey(c);
+      if(n && byNorm.has(n)) return byNorm.get(n);
+    }
+    return undefined;
+  };
+
+  out[DOC_TYPE_FIELD] = normalizeValue(pick(DOC_TYPE_FIELD, 't', 'type', 'doc_type'));
+  fields.forEach((f, i)=>{ out[f] = normalizeValue(pick(f, 'k' + (i + 1))); });
   return out;
 }
 
