@@ -1,0 +1,1790 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مستخرج ومحلّل بيانات الفواتير والتحويلات - النسخة الشاملة الموحدة Pro Ultra</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chart.js/4.4.0/chart.umd.min.js"></script>
+
+<!-- دمج مكتبة PDF.js لمعالجة PDF متعدد الصفحات محلياً -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  // إصلاح: بناء UMD لـ pdf.js 3.x يُصدّر window.pdfjsLib وليس window['pdfjs-dist/build/pdf'].
+  // الشرط القديم كان يفشل دائماً فلا يُضبط workerSrc، فيعمل pdf.js بـ "fake worker" (بطيء ويجمّد الواجهة).
+  (function () {
+    var lib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+    if (lib && lib.GlobalWorkerOptions) {
+      window.pdfjsLib = lib;
+      lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  })();
+</script>
+
+<style>
+  :root{
+    --bg:#f4f5f7;
+    --card:#ffffff;
+    --ink:#1c1f26;
+    --muted:#6b7280;
+    --accent:#146c5b;
+    --accent-dark:#0d4a3e;
+    --line:#e5e7eb;
+    --danger:#c0392b;
+    --ok:#1e8e5a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Cairo',sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    min-height:100vh;
+    padding:32px 16px;
+  }
+  .wrap{max-width:1020px;margin:0 auto;}
+  h1{font-size:24px;font-weight:800;margin:0 0 6px;}
+  .sub{color:var(--muted);margin:0 0 28px;font-size:14px;line-height:1.6;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:22px 24px;
+    margin-bottom:20px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.03);
+  }
+  .card h2{
+    font-size:15px;font-weight:700;margin:0 0 14px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .step-num{
+    background:var(--accent);color:#fff;width:24px;height:24px;border-radius:50%;
+    display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;
+  }
+  label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#374151;}
+  input[type=password], input[type=text], select, textarea{
+    width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;
+    font-family:'Cairo',sans-serif;font-size:14px;background:#fafafa;
+  }
+  textarea{resize:vertical;min-height:80px;}
+  input:focus, select:focus, textarea:focus{outline:none;border-color:var(--accent);background:#fff;}
+  .row{display:flex;gap:14px;flex-wrap:wrap;}
+  .row > div{flex:1;min-width:220px;}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6;}
+  button{
+    font-family:'Cairo',sans-serif;font-weight:700;font-size:14px;
+    border:none;border-radius:9px;padding:11px 20px;cursor:pointer;
+    transition:background .15s, opacity .15s;
+  }
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:hover{background:var(--accent-dark);}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-outline{background:#fff;color:var(--accent);border:1.5px solid var(--accent);}
+  .btn-outline:hover{background:#f0f7f5;}
+  .btn-danger{background:#fff;color:var(--danger);border:1.5px solid var(--danger);}
+  #folderInput{display:none;}
+  .drop-btn{
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    border:2px dashed var(--line);border-radius:10px;padding:26px;
+    color:var(--muted);cursor:pointer;font-weight:600;font-size:14px;text-align:center;
+  }
+  .drop-btn:hover{border-color:var(--accent);color:var(--accent);background:#f7fbfa;}
+  .file-list{margin-top:14px;font-size:13px;color:var(--muted);}
+  .file-list span{color:var(--ink);font-weight:700;}
+  .progress-wrap{margin-top:16px;display:none;}
+  .progress-bar-bg{background:var(--line);border-radius:6px;height:10px;overflow:hidden;}
+  .progress-bar{background:var(--accent);height:100%;width:0%;transition:width .25s;}
+  .progress-txt{font-size:12px;color:var(--muted);margin-top:6px;display:flex;justify-content:space-between;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;}
+  th, td{border:1px solid var(--line);padding:8px 10px;text-align:right;}
+  th{background:#f0f7f5;color:var(--accent-dark);font-weight:700;white-space:nowrap;}
+  .verdict-col{min-width:220px;background:#fcfcfd;}
+  th.verdict-col{background:#eef2ff;color:#1a1a4d;}
+  td[contenteditable=true]{cursor:text;}
+  td[contenteditable=true]:focus{outline:2px solid var(--accent);outline-offset:-2px;}
+  .status-ok{color:var(--ok);font-weight:700;}
+  .status-err{color:var(--danger);font-weight:700;}
+  .doc-badge{
+    display:inline-block;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;
+  }
+  .doc-badge-invoice{background:#e6f4ea;color:#1e8e5a;}
+  .doc-badge-transfer{background:#e8f0fe;color:#1a56db;}
+  .doc-badge-other{background:#f1f2f4;color:#6b7280;}
+  .flag-badge{
+    display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;
+  }
+  .flag-bad{background:#fdecea;color:var(--danger);}
+  .flag-good{background:#e6f4ea;color:#1e8e5a;}
+  .flag-neutral{background:#f1f2f4;color:#6b7280;}
+  .table-scroll{overflow-x:auto;}
+  .top-actions{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;}
+  .empty{color:var(--muted);font-size:13px;padding:20px;text-align:center;}
+  .footer-note{font-size:12px;color:var(--muted);margin-top:26px;text-align:center;line-height:1.8;}
+
+  /* Summary bar */
+  #summaryBar{display:none;flex-wrap:wrap;gap:10px;margin:14px 0;}
+  .stat-card{
+    flex:1;min-width:130px;background:#fafbfc;border:1px solid var(--line);border-radius:10px;
+    padding:12px 14px;text-align:center;
+  }
+  .stat-card .stat-num{font-size:20px;font-weight:800;color:var(--accent-dark);display:block;}
+  .stat-card.stat-danger .stat-num{color:var(--danger);}
+  .stat-card .stat-label{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  /* Preview modal */
+  .preview-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;
+    display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+  .preview-box{
+    background:#fff;border-radius:12px;max-width:90vw;max-height:90vh;
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+  .preview-header{
+    display:flex;justify-content:space-between;align-items:center;gap:14px;
+    padding:12px 16px;border-bottom:1px solid var(--line);font-weight:700;
+  }
+  .preview-zoom-controls{display:flex;align-items:center;gap:6px;font-weight:400;font-size:12px;color:var(--muted);}
+  .zoom-btn{padding:4px 10px;font-size:14px;min-width:34px;}
+  #zoomLabel{min-width:44px;text-align:center;font-weight:700;color:var(--ink);}
+  .preview-body{padding:16px;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:16px;}
+  .preview-body img{max-width:100%;max-height:75vh;border-radius:6px;transition:transform .08s ease-out;transform-origin:center center;cursor:grab;}
+  .preview-body img:active{cursor:grabbing;}
+  .preview-body iframe{width:75vw;height:75vh;border:none;}
+  .preview-btn{padding:4px 10px;font-size:12px;margin-top:6px;}
+
+  /* AI overview report */
+  .report-box{max-width:760px;width:90vw;}
+  .report-body{
+    display:block;text-align:right;padding:24px 28px;overflow-y:auto;max-height:75vh;
+    line-height:1.9;font-size:14px;
+  }
+  .report-body h2{font-size:19px;color:var(--accent-dark);margin:0 0 14px;border-bottom:2px solid var(--line);padding-bottom:8px;}
+  .report-body h3{font-size:16px;color:var(--accent-dark);margin:22px 0 8px;}
+  .report-body h4{font-size:14px;color:var(--accent);margin:16px 0 6px;}
+  .report-body p{margin:0 0 12px;}
+  .report-body ul{margin:0 0 14px;padding-right:22px;}
+  .report-body li{margin-bottom:6px;}
+  .report-body strong{color:var(--danger);}
+  .report-loading{text-align:center;padding:50px 20px;color:var(--muted);}
+  .report-loading .spinner{
+    width:36px;height:36px;border:4px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;margin:0 auto 16px;animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .report-error{color:var(--danger);text-align:center;padding:30px;}
+
+  /* Dashboard */
+  #dashboardCard{display:none;}
+  .dash-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+  .dash-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(340px,1fr));gap:20px;margin-top:16px;}
+  .dash-panel{
+    background:linear-gradient(180deg,#fbfdfc,#f6f9f8);
+    border:1px solid var(--line);border-radius:14px;padding:18px;
+  }
+  .dash-panel h3{font-size:14px;margin:0 0 4px;color:var(--accent-dark);display:flex;align-items:center;gap:6px;}
+  .dash-panel .dash-sub{font-size:11px;color:var(--muted);margin-bottom:10px;}
+  .chart-wrap{position:relative;height:260px;}
+  .dash-highlight{
+    margin-top:10px;font-size:13px;font-weight:700;color:#fff;background:var(--danger);
+    text-align:center;padding:8px;border-radius:8px;
+  }
+  .dash-highlight.calm{background:var(--accent);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📄 مستخرج ومحلّل بيانات الفواتير والتحويلات Pro (دعم PDF متعدد الصفحات)</h1>
+  <p class="sub">تجمع بين الرؤية البصرية والحسابات المباشرة، مع دعم تحويل ملفات الـ PDF متعددة الصفحات تلقائياً إلى صور عالية الدقة داخل المتصفح.</p>
+
+  <!-- Step 1: API Key & Model -->
+  <div class="card">
+    <h2><span class="step-num">1</span> مفتاح OpenRouter API والموديل وسرعة التوازي</h2>
+    <div class="row">
+      <div>
+        <label for="apiKey">OpenRouter API Key</label>
+        <input type="password" id="apiKey" placeholder="sk-or-v1-...">
+      </div>
+      <div>
+        <label for="modelName">اسم الموديل (model slug)</label>
+        <!-- تم تعديل اسم الموديل إلى نموذج قياسي مستقر يدعم الرؤية البصرية -->
+        <input type="text" id="modelName" placeholder="مثال: anthropic/claude-3.5-sonnet" value="anthropic/claude-3.5-sonnet">
+      </div>
+      <div>
+        <label for="concurrencySelect">سرعة المعالجة (توازي الطلبات)</label>
+        <select id="concurrencySelect">
+          <option value="1">1 ملف في وقت واحد (تسلسلي هادئ)</option>
+          <option value="3" selected>3 ملفات متوازية (متوازن وسريع - موصى به)</option>
+          <option value="5">5 ملفات متوازية (فائق السرعة)</option>
+        </select>
+      </div>
+    </div>
+    <div class="hint">
+      المفتاح يُستخدم مباشرة من متصفحك. قائمة الموديلات المتاحة في <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a>.
+      &nbsp;<label style="display:inline;font-weight:400;"><input type="checkbox" id="rememberKey" style="width:auto;vertical-align:middle;"> تذكّر المفتاح والموديل في هذا المتصفح فقط</label>
+    </div>
+  </div>
+
+  <!-- Step 2: Folder -->
+  <div class="card">
+    <h2><span class="step-num">2</span> اختيار المجلد</h2>
+    <input type="file" id="folderInput" webkitdirectory directory multiple>
+    <div class="drop-btn" id="dropBtn">📁 اضغط هنا لاختيار مجلد الفواتير أو المستندات من جهازك</div>
+    <div class="file-list" id="fileListInfo"></div>
+  </div>
+
+  <!-- Step 3: Fields -->
+  <div class="card">
+    <h2><span class="step-num">3</span> الحقول المطلوب استخراجها والتحقق منها</h2>
+    <label for="fields">اكتب أسماء الحقول مفصولة بفاصلة</label>
+    <textarea id="fields" placeholder="الحقول">رقم الفاتورة, تاريخ الفاتورة, اسم البائع, نشاط/تخصص المحل, الرقم الضريبي للبائع, رقم هاتف البائع, اسم المشتري, الأصناف أو الخدمات المذكورة, المبلغ قبل الضريبة, نسبة الضريبة, قيمة الضريبة, المبلغ الإجمالي, تدقيق جمع بنود الفاتورة, تاريخ الختم إن وجد, تطابق تاريخ الختم مع تاريخ الفاتورة, تطابق الأصناف مع نشاط المحل, هل يوجد رمز QR, هل الفاتورة مكتوبة يدوياً أم مطبوعة, وصف نمط الخط اليدوي إن وجد, وصف شكل التوقيع إن وجد, البنك المحوّل منه, البنك المحوّل إليه, رقم التحويل, تاريخ التحويل, مبلغ التحويل, مؤشرات اشتباه بالتلاعب</textarea>
+    <div class="hint">
+      💡 <b>دعم PDF متعدد الصفحات:</b> يتم محلياً تحويل كل صفحة في ملف الـ PDF إلى صورة عالية الدقة وإرسالها معاً للنموذج ليقرأ جميع صفحات الفاتورة دفعة واحدة دون افتراض أو نقص.
+    </div>
+    <div class="hint" style="margin-top:12px;border-top:1px dashed var(--line);padding-top:12px;">
+      <b>💰 توفير التوكنز (اختياري — مطفأ افتراضياً للحفاظ على أقصى دقة):</b><br>
+      <label style="display:inline;font-weight:400;"><input type="checkbox" id="compactKeys" style="width:auto;vertical-align:middle;"> مفاتيح JSON مختصرة في المخرجات (k1..kN بدل تكرار أسماء الحقول العربية الطويلة)</label><br>
+      <label style="display:inline;font-weight:400;"><input type="checkbox" id="shrinkImages" style="width:auto;vertical-align:middle;"> تصغير الصور الكبيرة قبل الإرسال (أطول ضلع ≤ 1400px)</label>
+      <div style="margin-top:6px;">
+        نص التعليمات والقواعد الصارمة يبقى كما هو حرفياً في الحالتين — التوفير يكون في <b>مخرجات</b> النموذج وحجم الصور فقط، لا في دقة البرومبت.
+      </div>
+    </div>
+    <label for="expectedYear" style="margin-top:14px;">السنة المتوقعة للفواتير (اختياري)</label>
+    <input type="text" id="expectedYear" placeholder="مثال: 2026" style="max-width:160px;">
+    <div class="hint">ستتم المقارنة البرمجية تلقائياً بالسنة المستخرجة من كل فاتورة وتظهر علامة تحذير عند أي اختلاف.</div>
+  </div>
+
+  <!-- Step 4: Run -->
+  <div class="card">
+    <h2><span class="step-num">4</span> المعالجة والنتائج</h2>
+    <div class="top-actions">
+      <button class="btn-primary" id="runBtn">🚀 بدء الاستخراج</button>
+      <button class="btn-outline" id="pauseBtn" style="display:none;">⏸ إيقاف مؤقت</button>
+      <button class="btn-danger" id="stopBtn" style="display:none;">⏹ إيقاف العملية</button>
+      <button class="btn-outline" id="exportBtn" disabled>⬇️ تصدير إلى Excel</button>
+      <button class="btn-outline" id="aiOverviewBtn" disabled>🧠 تحليل شامل بالذكاء الاصطناعي</button>
+    </div>
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="progress-txt"><span id="progressLabel">جارٍ المعالجة...</span><span id="progressCount">0/0</span></div>
+    </div>
+    <div id="summaryBar"></div>
+    <div class="table-scroll" id="resultsWrap">
+      <div class="empty">لا توجد نتائج بعد</div>
+    </div>
+  </div>
+
+  <!-- Step 5: Dashboard -->
+  <div class="card" id="dashboardCard">
+    <div class="dash-header">
+      <h2><span class="step-num">5</span> 📊 لوحة التحليل التفاعلية</h2>
+      <button class="btn-outline" id="refreshDashBtn" style="padding:6px 14px;font-size:12px;">🔄 تحديث الرسوم</button>
+    </div>
+    <div class="dash-grid">
+      <div class="dash-panel">
+        <h3>🗓️ الجدول الزمني للمبالغ</h3>
+        <div class="dash-sub">إجمالي مبالغ الفواتير والتحويلات مجمّعة حسب اليوم</div>
+        <div class="chart-wrap"><canvas id="timelineChart"></canvas></div>
+        <div class="dash-highlight" id="timelineHighlight"></div>
+      </div>
+      <div class="dash-panel">
+        <h3>🏪 المبالغ حسب البائع</h3>
+        <div class="dash-sub">أعلى 10 بائعين من حيث إجمالي المبالغ (والباقي مجمّع تحت "أخرى")</div>
+        <div class="chart-wrap"><canvas id="vendorChart"></canvas></div>
+      </div>
+      <div class="dash-panel">
+        <h3>🚦 توزيع درجة الخطورة</h3>
+        <div class="dash-sub">حسب عدد مؤشرات الاشتباه في كل ملف: 0 = طبيعي، 1 = متوسط، 2+ = خطير</div>
+        <div class="chart-wrap"><canvas id="riskChart"></canvas></div>
+      </div>
+      <div class="dash-panel">
+        <h3>🔍 التكرار حسب نوع المؤشر</h3>
+        <div class="dash-sub">عدد الملفات التي أثار كل مؤشر اشتباه فيها تحديداً</div>
+        <div class="chart-wrap"><canvas id="indicatorChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="footer-note">
+    تتم كافة العمليات الحسابية والتقاطعية وتحويل صفحات الـ PDF إلى صور محلياً داخل متصفحك.<br>
+    تضمن خاصية تحويل الـ PDF بصرية كاملة ودقيقة حتى للفواتير المكونة من عدة صفحات متتالية.
+  </p>
+</div>
+
+<!-- Preview Modal -->
+<div id="previewModal" class="preview-overlay" style="display:none;">
+  <div class="preview-box">
+    <div class="preview-header">
+      <span id="previewTitle"></span>
+      <div class="preview-zoom-controls" id="previewZoomControls">
+        <button id="zoomOutBtn" class="btn-outline zoom-btn" title="تصغير">－</button>
+        <span id="zoomLabel">100%</span>
+        <button id="zoomInBtn" class="btn-outline zoom-btn" title="تكبير">＋</button>
+        <button id="zoomResetBtn" class="btn-outline zoom-btn" title="إعادة الحجم الأصلي">1:1</button>
+      </div>
+      <button id="previewCloseBtn" class="btn-outline" style="padding:6px 14px;">✕ إغلاق</button>
+    </div>
+    <div class="preview-body" id="previewBody"></div>
+  </div>
+</div>
+
+<!-- AI Report Modal -->
+<div id="aiReportModal" class="preview-overlay" style="display:none;">
+  <div class="preview-box report-box">
+    <div class="preview-header">
+      <span>🧠 تحليل ذكاء اصطناعي شامل للجدول</span>
+      <button id="aiReportCloseBtn" class="btn-outline" style="padding:6px 14px;">✕ إغلاق</button>
+    </div>
+    <div class="preview-body report-body" id="aiReportBody"></div>
+  </div>
+</div>
+
+<script>
+let selectedFiles = [];
+let results = [];
+let fieldNames = [];
+
+const DOC_TYPE_FIELD = 'نوع المستند';
+const MATH_CHECK_FIELD = 'تحقق حسابي محلي (قبل الضريبة + الضريبة = الإجمالي)';
+const MATH_RATE_CHECK = 'تحقق نسبة الضريبة محلياً';
+const STAMP_MATCH_CHECK = 'تطابق تاريخ الختم مع التاريخ';
+const CROSS_PHONE_FIELD = 'تكرار الهاتف مع بائع آخر';
+const DUP_INVOICE_FIELD = 'فاتورة مكررة (نفس الرقم والمبلغ)';
+const CROSS_SEQ_FIELD = 'تسلسل فواتير مريب';
+const YEAR_CHECK_FIELD = 'تحقق السنة المتوقعة';
+const DUP_FILE_FIELD = 'ملف مكرر (نفس الصورة تماماً)';
+const SPLIT_FIELD = 'احتمال تقسيم فاتورة';
+const VERDICT_FIELD = '⚖️ الخلاصة النهائية';
+
+const HTML_ESCAPES = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+// إصلاح أمني/عرضي: كل قيمة قادمة من اسم ملف أو من رد النموذج كانت تُحقن خاماً في innerHTML،
+// فأي قيمة تحتوي < أو & كانت تكسر الجدول أو تحقن HTML.
+function escapeHtml(v){
+  if(v == null) return '';
+  return String(v).replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+}
+
+// إصلاح: النموذج قد يُرجع مصفوفة (مثل "الأصناف") أو كائناً أو السلسلة "null"،
+// وكان ذلك يُعرض كـ [object Object] أو كنص "null".
+function normalizeValue(v){
+  if(v == null) return '';
+  if(Array.isArray(v)) return v.map(x => (x && typeof x === 'object') ? JSON.stringify(x) : String(x)).join('، ');
+  if(typeof v === 'object') return JSON.stringify(v);
+  const s = String(v).trim();
+  if(/^(null|undefined|n\/a|na|-|--)$/i.test(s)) return '';
+  return s;
+}
+
+async function computeFileHash(file){
+  try{
+    const buf = await file.arrayBuffer();
+    const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }catch(e){
+    return null;
+  }
+}
+
+const apiKeyInput = document.getElementById('apiKey');
+const rememberKey = document.getElementById('rememberKey');
+const folderInput = document.getElementById('folderInput');
+const dropBtn = document.getElementById('dropBtn');
+const fileListInfo = document.getElementById('fileListInfo');
+const runBtn = document.getElementById('runBtn');
+const stopBtn = document.getElementById('stopBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const exportBtn = document.getElementById('exportBtn');
+const aiOverviewBtn = document.getElementById('aiOverviewBtn');
+const aiReportModal = document.getElementById('aiReportModal');
+const aiReportBody = document.getElementById('aiReportBody');
+const aiReportCloseBtn = document.getElementById('aiReportCloseBtn');
+const progressWrap = document.getElementById('progressWrap');
+const progressBar = document.getElementById('progressBar');
+const progressLabel = document.getElementById('progressLabel');
+const progressCount = document.getElementById('progressCount');
+const resultsWrap = document.getElementById('resultsWrap');
+const fieldsInput = document.getElementById('fields');
+const modelNameInput = document.getElementById('modelName');
+const expectedYearInput = document.getElementById('expectedYear');
+const compactKeysInput = document.getElementById('compactKeys');
+const shrinkImagesInput = document.getElementById('shrinkImages');
+const summaryBar = document.getElementById('summaryBar');
+const dashboardCard = document.getElementById('dashboardCard');
+const refreshDashBtn = document.getElementById('refreshDashBtn');
+let timelineChartInstance = null, vendorChartInstance = null, riskChartInstance = null, indicatorChartInstance = null;
+const previewModal = document.getElementById('previewModal');
+const previewTitle = document.getElementById('previewTitle');
+const previewBody = document.getElementById('previewBody');
+const previewCloseBtn = document.getElementById('previewCloseBtn');
+const previewZoomControls = document.getElementById('previewZoomControls');
+const zoomInBtn = document.getElementById('zoomInBtn');
+const zoomOutBtn = document.getElementById('zoomOutBtn');
+const zoomResetBtn = document.getElementById('zoomResetBtn');
+const zoomLabel = document.getElementById('zoomLabel');
+
+if(localStorage.getItem('or_extractor_key')){
+  apiKeyInput.value = localStorage.getItem('or_extractor_key');
+  rememberKey.checked = true;
+}
+if(localStorage.getItem('or_extractor_model')){
+  modelNameInput.value = localStorage.getItem('or_extractor_model');
+}
+// إصلاح: سابقاً لو كتب المستخدم المفتاح ثم أشّر "تذكّر" لم يُحفظ شيء إلا بعد تعديل جديد.
+rememberKey.addEventListener('change', ()=>{
+  if(rememberKey.checked){
+    localStorage.setItem('or_extractor_key', apiKeyInput.value);
+    localStorage.setItem('or_extractor_model', modelNameInput.value);
+  } else {
+    localStorage.removeItem('or_extractor_key');
+    localStorage.removeItem('or_extractor_model');
+  }
+});
+apiKeyInput.addEventListener('input', ()=>{
+  if(rememberKey.checked) localStorage.setItem('or_extractor_key', apiKeyInput.value);
+});
+modelNameInput.addEventListener('input', ()=>{
+  if(rememberKey.checked) localStorage.setItem('or_extractor_model', modelNameInput.value);
+});
+expectedYearInput.addEventListener('input', ()=>{
+  if(results.length > 0) renderTable();
+});
+
+const SUPPORTED_IMG = ['image/jpeg','image/png','image/webp','image/gif'];
+const SUPPORTED_PDF = ['application/pdf'];
+
+dropBtn.addEventListener('click', ()=> folderInput.click());
+
+folderInput.addEventListener('change', (e)=>{
+  const all = Array.from(e.target.files);
+  selectedFiles = all.filter(f => SUPPORTED_IMG.includes(f.type) || SUPPORTED_PDF.includes(f.type));
+  const skipped = all.length - selectedFiles.length;
+  fileListInfo.innerHTML = `تم العثور على <span>${selectedFiles.length}</span> ملف مدعوم (صور/PDF)` +
+    (skipped > 0 ? ` — تم تجاهل ${skipped} ملف غير مدعوم.` : '');
+});
+
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// محول PDF متعدد الصفحات إلى صور عالي الوضوح
+// السقف يحمي من صفحات ضخمة (A0 مثلاً) تُنتج لوحات بعشرات الميغابكسل تُجمّد المتصفح،
+// ومع ذلك تُصغّرها الخدمة على الخادم فلا فائدة منها.
+const PDF_BASE_SCALE = 1.8;   // دقة عالية لقراءة النصوص الصغيرة (كما كانت)
+const PDF_MAX_DIM_FULL = 2200;
+const PDF_MAX_DIM_SAVER = 1400;
+
+async function convertPdfToPageImages(file, opts) {
+  const saver = !!(opts && opts.saver);
+  const maxDim = saver ? PDF_MAX_DIM_SAVER : PDF_MAX_DIM_FULL;
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pageImages = [];
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const base = page.getViewport({ scale: 1 });
+    const longSide = Math.max(base.width, base.height);
+    const scale = Math.min(PDF_BASE_SCALE, maxDim / longSide);
+    const viewport = page.getViewport({ scale: Math.max(scale, 0.5) });
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+
+    await page.render({ canvasContext: context, viewport: viewport }).promise;
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    pageImages.push({
+      pageNumber: pageNum,
+      base64: dataUrl.split(',')[1]
+    });
+    // تحرير ذاكرة اللوحة صراحةً (ملفات PDF كبيرة كانت تُراكم عشرات الميغابايت)
+    canvas.width = 0; canvas.height = 0;
+    page.cleanup();
+  }
+  await pdf.destroy();
+  return pageImages;
+}
+
+// تصغير اختياري للصور المرفوعة (وضع توفير التوكنز فقط)
+const IMG_MAX_DIM_SAVER = 1400;
+function shrinkImageFile(file){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      try{
+        const longSide = Math.max(img.naturalWidth, img.naturalHeight);
+        if(longSide <= IMG_MAX_DIM_SAVER){ URL.revokeObjectURL(url); resolve(null); return; }
+        const ratio = IMG_MAX_DIM_SAVER / longSide;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.naturalWidth * ratio);
+        canvas.height = Math.round(img.naturalHeight * ratio);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        canvas.width = 0; canvas.height = 0;
+        URL.revokeObjectURL(url);
+        resolve({ mime: 'image/jpeg', base64: dataUrl.split(',')[1] });
+      }catch(e){ URL.revokeObjectURL(url); resolve(null); }
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+// نص القواعد لا يتغيّر إطلاقاً بين الوضعين — الاختلاف الوحيد هو شكل مفاتيح JSON المطلوبة في الرد.
+const PROMPT_RULES = `قواعد صارمة وتوجيهات دقيقة للمخرجات:
+1. أي حقل تاريخ: أرجعه بصيغة ISO حصراً (YYYY-MM-DD). اقرأ أرقام السنة الأربعة بعناية ودقة تامة دون افتراض.
+2. أي حقل مبلغ أو نسبة: أرجع الرقم الصافي فقط بدون رموز عملات أو نصوص.
+3. لحقل "تطابق الأصناف مع نشاط المحل": حلل دلالياً اسم المحل ونشاطه واكتب "متوافق" أو "غير متوافق مع ذكر السبب".
+4. لحقل "تدقيق جمع بنود الفاتورة": اجمع الأسعار التفصيلية للبنود بصرية وقارنها بالمجموع المذكور واكتب النتيجة.
+5. لحقل الرقم الضريبي: تحقق من النمط الرسمي للرقم الضريبي (مثلاً في السعودية: 15 رقماً يبدأ وينتهي بالرقم 3).
+6. لحقل "مؤشرات اشتباه بالتلاعب": فحص بصرية المستند لوجود تعديلات أو خطوط مريبة، واكتب الملاحظات بوضوح. إن لم تجد شيئاً اكتب "لا توجد مؤشرات واضحة".
+7. لا تخمّن ولا تفترض أي قيمة غير ظاهرة في المستند؛ أرجع null لأي حقل غير موجود.
+8. كل قيمة يجب أن تكون نصاً بسيطاً (string) أو null — لا مصفوفات ولا كائنات متداخلة.`;
+
+const PROMPT_HEADER = `أنت محلل مالي ورؤية بصرية خبير متخصص في مراجعة الفواتير والتحويلات البنكية واكتشاف التلاعب والتزوير.`;
+
+function buildPrompt(fields, compact){
+  if(compact){
+    // وضع توفير التوكنز: النموذج يرى أسماء الحقول العربية كاملة (فلا تفقد الدقة)،
+    // لكنه يُرجع مفاتيح مختصرة بدل إعادة كتابة كل اسم حقل عربي طويل في الرد.
+    return `${PROMPT_HEADER}
+
+أولاً، صنّف المستند المرفق في المفتاح "t" بإحدى ثلاث قيم فقط حصراً: "فاتورة" أو "تحويل بنكي" أو "أخرى".
+
+استخرج الحقول التالية بدقة بصرية ودلالية متناهية (إذا كان المستند مكوناً من عدة صفحات/صور، اقرأ جميع الصفحات واستخرج بيانات الفاتورة المكتملة).
+لكل حقل مفتاح مختصر مقابل، استخدمه حرفياً في الرد والتزم بالترتيب نفسه:
+${fields.map((f,i)=>`k${i+1} = ${f}`).join('\n')}
+
+${PROMPT_RULES}
+
+أرجع الناتج بصيغة JSON صالحة حصراً بدون أي نص إضافي وبدون علامات Markdown، بالمفاتيح المختصرة فقط:
+{"t": "فاتورة أو تحويل بنكي أو أخرى", ${fields.map((f,i)=>`"k${i+1}": "القيمة أو null"`).join(', ')}}`;
+  }
+
+  return `${PROMPT_HEADER}
+
+أولاً، صنّف المستند المرفق في حقل "${DOC_TYPE_FIELD}" بإحدى ثلاث قيم فقط حصراً: "فاتورة" أو "تحويل بنكي" أو "أخرى".
+
+استخرج الحقول التالية بدقة بصرية ودلالية متناهية (إذا كان المستند مكوناً من عدة صفحات/صور، اقرأ جميع الصفحات واستخرج بيانات الفاتورة المكتملة):
+${fields.join('، ')}
+
+${PROMPT_RULES}
+
+أرجع الناتج بصيغة JSON صالحة حصراً بدون أي نص إضافي وبدون علامات Markdown:
+{"${DOC_TYPE_FIELD}": "فاتورة أو تحويل بنكي أو أخرى", ${fields.map(f=>`"${f}": "القيمة أو null"`).join(', ')}}`;
+}
+
+// يقبل الردّ بالمفاتيح العربية الكاملة أو بالمفاتيح المختصرة (k1..kN / t) — أياً كان ما أرجعه النموذج.
+function normalizeExtracted(obj, fields){
+  const out = {};
+  const rawType = (obj[DOC_TYPE_FIELD] !== undefined) ? obj[DOC_TYPE_FIELD]
+                : (obj.t !== undefined) ? obj.t
+                : (obj.type !== undefined) ? obj.type
+                : obj.doc_type;
+  out[DOC_TYPE_FIELD] = normalizeValue(rawType);
+
+  fields.forEach((f, i)=>{
+    const v = (obj[f] !== undefined) ? obj[f] : obj['k' + (i + 1)];
+    out[f] = normalizeValue(v);
+  });
+  return out;
+}
+
+async function fetchWithRetry(url, options, maxRetries = 5) {
+  let delay = 1000;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if ((response.status === 429 || response.status >= 500) && attempt < maxRetries && !options.signal?.aborted) {
+        await new Promise(r => setTimeout(r, delay));
+        delay *= 2;
+        continue;
+      }
+      return response;
+    } catch (err) {
+      if (err.name === 'AbortError') throw err;
+      if (attempt < maxRetries && !options.signal?.aborted) {
+        await new Promise(r => setTimeout(r, delay));
+        delay *= 2;
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+async function extractFromFile(file, fields, signal){
+  const isPdf = file.type === 'application/pdf';
+  const compact = !!(compactKeysInput && compactKeysInput.checked);
+  const saver = !!(shrinkImagesInput && shrinkImagesInput.checked);
+
+  // الصور أولاً ثم نص التعليمات — الترتيب الموصى به رسمياً لنماذج الرؤية ويحسّن دقة القراءة.
+  const contentBlocks = [];
+
+  if (isPdf) {
+    // تحويل جميع صفحات الـ PDF إلى صور بصرية
+    const pages = await convertPdfToPageImages(file, { saver });
+    pages.forEach(p => {
+      contentBlocks.push({
+        type: "image_url",
+        image_url: { url: `data:image/jpeg;base64,${p.base64}` }
+      });
+    });
+  } else {
+    const shrunk = saver ? await shrinkImageFile(file) : null;
+    if(shrunk){
+      contentBlocks.push({
+        type: "image_url",
+        image_url: { url: `data:${shrunk.mime};base64,${shrunk.base64}` }
+      });
+    } else {
+      const base64 = await fileToBase64(file);
+      contentBlocks.push({
+        type: "image_url",
+        image_url: { url: `data:${file.type};base64,${base64}` }
+      });
+    }
+  }
+
+  contentBlocks.push({ type: "text", text: buildPrompt(fields, compact) });
+
+  const model = modelNameInput.value.trim();
+
+  const response = await fetchWithRetry("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    signal: signal,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKeyInput.value.trim()}`
+    },
+    body: JSON.stringify({
+      model: model,
+      max_tokens: 4000,
+      temperature: 0,
+      messages: [{
+        role: "user",
+        content: contentBlocks
+      }]
+    })
+  });
+
+  if(!response.ok){
+    const errTxt = await response.text();
+    throw new Error(`HTTP ${response.status}: ${errTxt.slice(0,200)}`);
+  }
+
+  const data = await response.json();
+  if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+
+  const choice = data.choices && data.choices[0];
+  const msg = choice && choice.message;
+  if(!msg) throw new Error("رد غير متوقع من الخادم");
+
+  let rawText = '';
+  if(typeof msg.content === 'string') rawText = msg.content;
+  else if(Array.isArray(msg.content)) rawText = msg.content.map(p => (typeof p === 'string' ? p : (p.text || ''))).join('\n');
+
+  if(!rawText || !rawText.trim()) throw new Error("لم يُرجع الموديل نصاً — تأكد أن الموديل يدعم Vision");
+
+  let cleaned = rawText.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+
+  try{
+    return normalizeExtracted(JSON.parse(cleaned), fields);
+  }catch(e){
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if(match){
+      try{ return normalizeExtracted(JSON.parse(match[0]), fields); } catch(e2){}
+    }
+    // إصلاح: قطع الرد لبلوغ max_tokens كان يظهر كخطأ "تعذّر تحليل JSON" غامض.
+    if(choice.finish_reason === 'length' || choice.native_finish_reason === 'max_tokens'){
+      throw new Error("تم قطع رد الموديل لبلوغه حد max_tokens — قلّل عدد الحقول أو فعّل وضع المفاتيح المختصرة.");
+    }
+    throw new Error("تعذّر تحليل رد الموديل كـ JSON: " + cleaned.slice(0,150));
+  }
+}
+
+function isAmountField(f){
+  return ['مبلغ', 'قيمة', 'الإجمالي', 'نسبة'].some(k => f.includes(k));
+}
+
+function parseAmountNumber(str){
+  if(str == null) return null;
+  let s = String(str).trim();
+  if(!s) return null;
+  // أرقام عربية-هندية (٠-٩) وفارسية (۰-۹)
+  s = s.replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+       .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0));
+  // فاصل الآلاف العربي ٬ والفاصلة العشرية العربية ٫ والتطويل ـ
+  s = s.replace(/٬/g, '').replace(/٫/g, '.').replace(/ـ/g, '');
+  // مبلغ سالب مكتوب بين قوسين محاسبياً: (1,234.00)
+  const wrappedNegative = /^\(\s*[^)]*\d[^)]*\)\s*$/.test(s);
+  s = s.replace(/,/g, '');
+  const m = s.match(/-?\d+(\.\d+)?/);
+  if(!m) return null;
+  let num = parseFloat(m[0]);
+  if(isNaN(num)) return null;
+  if(wrappedNegative && num > 0) num = -num;
+  return num;
+}
+
+function findFieldName(keywords){
+  return fieldNames.find(f => keywords.every(k => f.includes(k)));
+}
+
+function normalizePhone(p){
+  return (p || '').toString().replace(/[^\d]/g, '');
+}
+
+function parseISODate(str){
+  if(!str) return null;
+  const m = String(str).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return null;
+  const d = new Date(Date.UTC(+m[1], +m[2]-1, +m[3]));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function extractInvoiceNum(str){
+  if(!str) return null;
+  const m = String(str).match(/(\d+)\s*$/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function clusterByDateProximity(items, maxGapDays){
+  const sorted = [...items].sort((a,b) => a.date - b.date);
+  const clusters = [];
+  let current = [];
+  for(let i=0; i<sorted.length; i++){
+    if(current.length === 0){ current.push(sorted[i]); continue; }
+    const prev = current[current.length - 1];
+    const gapDays = Math.abs((sorted[i].date - prev.date) / 86400000);
+    if(gapDays <= maxGapDays){
+      current.push(sorted[i]);
+    } else {
+      if(current.length > 1) clusters.push(current);
+      current = [sorted[i]];
+    }
+  }
+  if(current.length > 1) clusters.push(current);
+  return clusters;
+}
+
+function runCrossChecks(){
+  const phoneField = findFieldName(['هاتف']);
+  const vendorField = findFieldName(['اسم', 'البائع']);
+  const invoiceNumField = fieldNames.find(f => f.includes('رقم') && f.includes('الفاتورة'));
+  const invoiceDateField = fieldNames.find(f => f.includes('تاريخ') && f.includes('الفاتورة'));
+  const stampDateField = fieldNames.find(f => f.includes('تاريخ') && f.includes('الختم'));
+  const amountField = fieldNames.find(f => f.includes('المبلغ') && f.includes('الإجمالي')) || fieldNames.find(f => f.includes('المبلغ'));
+  const expectedYear = expectedYearInput.value.trim();
+
+  const netF = fieldNames.find(f => f.includes('قبل الضريبة'));
+  const vatF = fieldNames.find(f => f.includes('قيمة الضريبة'));
+  const rateF = fieldNames.find(f => f.includes('نسبة الضريبة'));
+
+  results.forEach(r => {
+    if(!r.data) return;
+    r.data[MATH_CHECK_FIELD] = '';
+    r.data[MATH_RATE_CHECK] = '';
+    r.data[STAMP_MATCH_CHECK] = '';
+    r.data[CROSS_PHONE_FIELD] = '';
+    r.data[CROSS_SEQ_FIELD] = '';
+    r.data[YEAR_CHECK_FIELD] = '';
+    r.data[DUP_INVOICE_FIELD] = '';
+    r.data[DUP_FILE_FIELD] = '';
+    r.data[SPLIT_FIELD] = '';
+
+    if(r.data[DOC_TYPE_FIELD] === 'فاتورة'){
+      const net = parseAmountNumber(r.data[netF]);
+      const vat = parseAmountNumber(r.data[vatF]);
+      const tot = parseAmountNumber(r.data[amountField]);
+      const rate = parseAmountNumber(r.data[rateF]);
+
+      if(net != null && vat != null && tot != null){
+        const calcSum = net + vat;
+        if(Math.abs(calcSum - tot) > 0.05){
+          r.data[MATH_CHECK_FIELD] = `🚩 خطأ جمع: ${net} + ${vat} = ${calcSum.toFixed(2)} ≠ ${tot}`;
+        } else {
+          r.data[MATH_CHECK_FIELD] = '✓ الحساب صحيح';
+        }
+      } else {
+        r.data[MATH_CHECK_FIELD] = 'تعذر التحقق (قيم ناقصة)';
+      }
+
+      if(net != null && vat != null && rate != null && net > 0){
+        const calcRate = (vat / net) * 100;
+        if(Math.abs(calcRate - rate) > 0.5){
+          r.data[MATH_RATE_CHECK] = `🚩 النسبة الفعلية ${calcRate.toFixed(1)}% ≠ المذكورة ${rate}%`;
+        } else {
+          r.data[MATH_RATE_CHECK] = '✓ النسبة متسقة';
+        }
+      }
+
+      if(stampDateField && invoiceDateField && r.data[stampDateField] && r.data[invoiceDateField]){
+        const dStamp = parseISODate(r.data[stampDateField]);
+        const dInv = parseISODate(r.data[invoiceDateField]);
+        if(dStamp && dInv){
+          r.data[STAMP_MATCH_CHECK] = (dStamp.getTime() === dInv.getTime())
+            ? '✓ متطابق'
+            : `🚩 غير متطابق (${r.data[stampDateField]} مقابل ${r.data[invoiceDateField]})`;
+        }
+      }
+    }
+  });
+
+  if(phoneField && vendorField){
+    const phoneMap = {};
+    results.forEach(r => {
+      if(!r.data) return;
+      const phone = normalizePhone(r.data[phoneField]);
+      const vendor = (r.data[vendorField] || '').trim();
+      if(!phone || !vendor) return;
+      if(!phoneMap[phone]) phoneMap[phone] = new Set();
+      phoneMap[phone].add(vendor);
+    });
+    results.forEach(r => {
+      if(!r.data) return;
+      const phone = normalizePhone(r.data[phoneField]);
+      if(!phone) return;
+      const vendors = phoneMap[phone];
+      if(vendors && vendors.size > 1){
+        r.data[CROSS_PHONE_FIELD] = `🚩 نفس الهاتف مستخدم مع: ${[...vendors].join('، ')}`;
+      }
+    });
+  }
+
+  if(vendorField && invoiceNumField && invoiceDateField){
+    const groups = {};
+    results.forEach((r, idx) => {
+      if(!r.data) return;
+      const vendor = (r.data[vendorField] || '').trim();
+      const num = extractInvoiceNum(r.data[invoiceNumField]);
+      const date = parseISODate(r.data[invoiceDateField]);
+      if(!vendor || num == null) return;
+      if(!groups[vendor]) groups[vendor] = [];
+      groups[vendor].push({ idx, num, date, fileName: r.fileName });
+    });
+    Object.values(groups).forEach(list => {
+      if(list.length < 2) return;
+      list.sort((a,b) => a.num - b.num);
+      for(let i=1; i<list.length; i++){
+        const prev = list[i-1], curr = list[i];
+        if(Math.abs(curr.num - prev.num) === 1 && prev.date && curr.date){
+          const gapDays = Math.round(Math.abs((curr.date - prev.date) / 86400000));
+          if(gapDays > 3){
+            results[prev.idx].data[CROSS_SEQ_FIELD] = `🚩 رقم متسلسل مع ${curr.fileName} (فارق ${gapDays} يوم)`;
+            results[curr.idx].data[CROSS_SEQ_FIELD] = `🚩 رقم متسلسل مع ${prev.fileName} (فارق ${gapDays} يوم)`;
+          }
+        }
+      }
+    });
+  }
+
+  if(vendorField && invoiceNumField && invoiceDateField && amountField){
+    const dupMap = {};
+    results.forEach((r, idx) => {
+      if(!r.data) return;
+      const vendor = (r.data[vendorField] || '').trim();
+      const invNum = (r.data[invoiceNumField] || '').toString().trim();
+      const amtNum = parseAmountNumber(r.data[amountField]);
+      const amount = amtNum != null ? amtNum.toString() : '';
+      const date = parseISODate(r.data[invoiceDateField]);
+      if(!vendor || !invNum || !amount || !date) return;
+      const key = `${vendor}||${invNum}||${amount}`;
+      const month = `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}`;
+      if(!dupMap[key]) dupMap[key] = [];
+      dupMap[key].push({ idx, month, fileName: r.fileName });
+    });
+    Object.values(dupMap).forEach(list => {
+      if(list.length < 2) return;
+      const distinctMonths = new Set(list.map(x => x.month));
+      if(distinctMonths.size > 1){
+        list.forEach(item => {
+          const others = list.filter(x => x.idx !== item.idx).map(x => x.fileName).join('، ');
+          results[item.idx].data[DUP_INVOICE_FIELD] = `🚩 نفس الرقم والمبلغ ظهر في شهور أخرى: ${others}`;
+        });
+      }
+    });
+  }
+
+  if(expectedYear && invoiceDateField){
+    results.forEach(r => {
+      if(!r.data) return;
+      const date = parseISODate(r.data[invoiceDateField]);
+      if(!date) return;
+      const year = date.getUTCFullYear();
+      r.data[YEAR_CHECK_FIELD] = (String(year) !== String(expectedYear))
+        ? `🚩 السنة المستخرجة ${year} تختلف عن المتوقع ${expectedYear}`
+        : `✓ مطابق (${year})`;
+    });
+  }
+
+  {
+    const hashMap = {};
+    results.forEach((r, idx) => {
+      if(!r.hash) return;
+      if(!hashMap[r.hash]) hashMap[r.hash] = [];
+      hashMap[r.hash].push({ idx, fileName: r.fileName });
+    });
+    Object.values(hashMap).forEach(list => {
+      if(list.length < 2) return;
+      list.forEach(item => {
+        const others = list.filter(x => x.idx !== item.idx).map(x => x.fileName).join('، ');
+        if(results[item.idx].data) results[item.idx].data[DUP_FILE_FIELD] = `🚩 نفس الصورة تماماً مرفوعة باسم: ${others}`;
+      });
+    });
+  }
+
+  if(vendorField && invoiceDateField && amountField){
+    const groups = {};
+    results.forEach((r, idx) => {
+      if(!r.data) return;
+      if(r.data[DOC_TYPE_FIELD] !== 'فاتورة') return;
+      const vendor = (r.data[vendorField] || '').trim();
+      const date = parseISODate(r.data[invoiceDateField]);
+      const amt = parseAmountNumber(r.data[amountField]);
+      if(!vendor || !date) return;
+      if(!groups[vendor]) groups[vendor] = [];
+      groups[vendor].push({ idx, date, amt: amt || 0, fileName: r.fileName });
+    });
+    Object.entries(groups).forEach(([vendor, items]) => {
+      const clusters = clusterByDateProximity(items, 3);
+      clusters.forEach(cluster => {
+        const sum = cluster.reduce((s,x) => s + x.amt, 0);
+        const spanDays = Math.round(Math.abs((cluster[cluster.length-1].date - cluster[0].date) / 86400000));
+        cluster.forEach(item => {
+          const others = cluster.filter(x => x.idx !== item.idx).map(x => x.fileName).join('، ');
+          results[item.idx].data[SPLIT_FIELD] = `🚩 ${cluster.length} فواتير من "${vendor}" خلال ${spanDays} يوم بإجمالي ${sum.toLocaleString('ar')} — راجع: ${others}`;
+        });
+      });
+    });
+  }
+
+  results.forEach(r => {
+    if(!r.data) return;
+    const triggered = getIndicatorKeys().filter(k => isBadForField(k, r.data[k]));
+    r.data[VERDICT_FIELD] = triggered.length === 0
+      ? '✓ لا توجد مؤشرات اشتباه'
+      : `🚩 ${triggered.length} مؤشر: ${triggered.map(k => getIndicatorLabel(k)).join('، ')}`;
+  });
+}
+
+function computedBadgeHtml(str){
+  const val = String(str || '').trim();
+  if(!val) return '<span style="color:#c7cbd1;">—</span>';
+  if(val.startsWith('🚩')) return `<span class="flag-badge flag-bad">${escapeHtml(val)}</span>`;
+  if(val.startsWith('✓')) return `<span class="flag-badge flag-good">${escapeHtml(val)}</span>`;
+  return `<span class="flag-badge flag-neutral">${escapeHtml(val)}</span>`;
+}
+
+function docBadgeHtml(docType){
+  const val = String(docType || '').trim();
+  let cls = 'doc-badge-other';
+  let label = val || '—';
+  if(val === 'فاتورة') cls = 'doc-badge-invoice';
+  else if(val === 'تحويل بنكي') cls = 'doc-badge-transfer';
+  return `<span class="doc-badge ${cls}">${escapeHtml(label)}</span>`;
+}
+
+// إصلاح جوهري: الفحص القديم كان يعتبر "لا يوجد خطأ" أو "بدون أخطاء" مؤشر اشتباه
+// لمجرد احتوائها على كلمة "خطأ" — أي إنذارات كاذبة على الفواتير السليمة.
+const NEGATION_RE = /(لا\s*(يوجد|توجد|تُوجد|أجد)|ليس\s*هناك|بدون|خالٍ\s*من|خالية\s*من|دون\s*وجود)\s*(أي\s*)?(خطأ|أخطاء|مؤشر|مؤشرات|ملاحظ|تعارض|اختلاف|تلاعب|شبه|اشتباه)/;
+const EMPTY_NOTE_RE = /^(لا|لا شيء|لا يوجد|لا توجد|لا توجد مؤشرات واضحة|none|no|nil|غير متوفر|غير محدد|—|-)$/i;
+
+function isBadFlagValue(val){
+  if(!val) return false;
+  const v = String(val).trim();
+  if(!v) return false;
+  if(v.startsWith('🚩')) return true;
+  if(v.startsWith('✓')) return false;
+  if(NEGATION_RE.test(v)) return false;
+  return v.includes('غير متطابق') || v.includes('غير متوافق') || v.startsWith('غير صحيح') || v.includes('خطأ');
+}
+
+// حقل "مؤشرات اشتباه بالتلاعب" نصّي حر: أي ملاحظة غير منفية تُعدّ مؤشراً.
+// كان مُهملاً تماماً في الخلاصة والمخاطر، فتظهر "لا توجد مؤشرات اشتباه" رغم أن النموذج كتب ملاحظات تزوير.
+function getSuspicionField(){
+  return fieldNames.find(f => f.includes('اشتباه') || f.includes('تلاعب'));
+}
+
+function isBadForField(key, val){
+  if(key && key === getSuspicionField()){
+    const v = normalizeValue(val);
+    if(!v) return false;
+    if(EMPTY_NOTE_RE.test(v)) return false;
+    if(NEGATION_RE.test(v)) return false;
+    return true;
+  }
+  return isBadFlagValue(val);
+}
+
+const FLAG_FIELDS = ['تطابق تاريخ الختم مع تاريخ الفاتورة', 'تطابق الأصناف مع نشاط المحل', 'تدقيق جمع بنود الفاتورة'];
+
+function flagCellHtml(value){
+  const val = String(value || '').trim();
+  if(!val) return '';
+  if(isBadFlagValue(val)){
+    return `<span class="flag-badge flag-bad">🚩 ${escapeHtml(val)}</span>`;
+  }
+  if(val.startsWith('متطابق') || val.startsWith('متوافق') || val.startsWith('صحيح')){
+    return `<span class="flag-badge flag-good">✓ ${escapeHtml(val)}</span>`;
+  }
+  return `<span class="flag-badge flag-neutral">${escapeHtml(val)}</span>`;
+}
+
+function getIndicatorKeys(){
+  const suspicion = getSuspicionField();
+  return [
+    MATH_CHECK_FIELD, MATH_RATE_CHECK, STAMP_MATCH_CHECK, CROSS_PHONE_FIELD, CROSS_SEQ_FIELD,
+    DUP_INVOICE_FIELD, YEAR_CHECK_FIELD, DUP_FILE_FIELD, SPLIT_FIELD,
+    ...FLAG_FIELDS.filter(f => fieldNames.includes(f)),
+    ...(suspicion ? [suspicion] : [])
+  ];
+}
+
+function getIndicatorLabel(key){
+  const labels = {
+    [MATH_CHECK_FIELD]: 'خطأ حساب الإجمالي محلياً',
+    [MATH_RATE_CHECK]: 'عدم اتساق نسبة الضريبة محلياً',
+    [STAMP_MATCH_CHECK]: 'عدم تطابق تاريخ الختم',
+    [CROSS_PHONE_FIELD]: 'هاتف مكرر مع بائع آخر',
+    [CROSS_SEQ_FIELD]: 'تسلسل فواتير مريب',
+    [DUP_INVOICE_FIELD]: 'فاتورة مكررة',
+    [YEAR_CHECK_FIELD]: 'سنة مخالفة للمتوقع',
+    [DUP_FILE_FIELD]: 'ملف مكرر (SHA-256)',
+    [SPLIT_FIELD]: 'احتمال تقسيم فاتورة'
+  };
+  if(key && key === getSuspicionField()) return 'ملاحظات تلاعب من الفحص البصري';
+  return labels[key] || key;
+}
+
+function classifyRisk(r){
+  if(!r.data) return { level: 'طبيعي', count: 0, triggered: [] };
+  const triggered = getIndicatorKeys().filter(k => isBadForField(k, r.data[k]));
+  let level = 'طبيعي';
+  if(triggered.length >= 2) level = 'خطير';
+  else if(triggered.length === 1) level = 'متوسط';
+  return { level, count: triggered.length, triggered };
+}
+
+let currentPreviewUrl = null;
+let currentZoom = 1;
+const ZOOM_MIN = 0.5, ZOOM_MAX = 5, ZOOM_STEP = 0.25;
+
+function setZoom(z){
+  currentZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+  const imgs = previewBody.querySelectorAll('img');
+  imgs.forEach(img => img.style.transform = `scale(${currentZoom})`);
+  zoomLabel.textContent = Math.round(currentZoom * 100) + '%';
+}
+
+async function openPreview(file){
+  if(!file) return;
+  if(currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
+  currentPreviewUrl = URL.createObjectURL(file);
+  previewTitle.textContent = file.name;
+  // إصلاح: كان مؤشر التكبير يبقى معروضاً بقيمة الملف السابق بعد فتح ملف جديد.
+  currentZoom = 1;
+  zoomLabel.textContent = '100%';
+
+  if(file.type === 'application/pdf'){
+    previewBody.innerHTML = '<div style="color:var(--muted)">جارٍ تحميل صفحات PDF...</div>';
+    previewModal.style.display = 'flex';
+    try{
+      const pages = await convertPdfToPageImages(file);
+      previewBody.innerHTML = pages.map(p => `<div style="text-align:center"><img src="data:image/jpeg;base64,${p.base64}" style="max-width:100%;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.15)"><p style="font-size:12px;color:var(--muted);margin-top:4px;">صفحة ${p.pageNumber} من ${pages.length}</p></div>`).join('');
+      previewZoomControls.style.display = 'flex';
+      setZoom(1);
+    }catch(e){
+      previewBody.innerHTML = `<iframe src="${escapeHtml(currentPreviewUrl)}"></iframe>`;
+      previewZoomControls.style.display = 'none';
+    }
+  } else {
+    previewBody.innerHTML = `<img src="${escapeHtml(currentPreviewUrl)}" alt="${escapeHtml(file.name)}">`;
+    previewZoomControls.style.display = 'flex';
+    zoomLabel.textContent = '100%';
+  }
+  previewModal.style.display = 'flex';
+}
+
+zoomInBtn.addEventListener('click', () => setZoom(currentZoom + ZOOM_STEP));
+zoomOutBtn.addEventListener('click', () => setZoom(currentZoom - ZOOM_STEP));
+zoomResetBtn.addEventListener('click', () => setZoom(1));
+
+function closePreview(){
+  previewModal.style.display = 'none';
+  previewBody.innerHTML = '';
+  if(currentPreviewUrl){ URL.revokeObjectURL(currentPreviewUrl); currentPreviewUrl = null; }
+}
+
+previewCloseBtn.addEventListener('click', closePreview);
+previewModal.addEventListener('click', (e)=>{ if(e.target === previewModal) closePreview(); });
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape' && previewModal.style.display === 'flex') closePreview();
+  if(e.key === 'Escape' && aiReportModal.style.display === 'flex') aiReportModal.style.display = 'none';
+});
+
+function renderSummaryBar(){
+  if(results.length === 0){ summaryBar.style.display = 'none'; return; }
+
+  const total = results.length;
+  // إصلاح تناقض: كان العدّاد يمسح كل الحقول النصية الحرة (فيعدّ "تعذر التحقق" أو أي نص فيه كلمة "خطأ")
+  // فيختلف عن عمود "الخلاصة النهائية". الآن كلاهما يعتمد نفس مجموعة المؤشرات.
+  const flaggedCount = results.filter(r => classifyRisk(r).count > 0).length;
+  const invoiceCount = results.filter(r => r.data && r.data[DOC_TYPE_FIELD] === 'فاتورة').length;
+  const transferCount = results.filter(r => r.data && r.data[DOC_TYPE_FIELD] === 'تحويل بنكي').length;
+  const errorCount = results.filter(r => r.error).length;
+
+  const totalField = fieldNames.find(f => f.includes('المبلغ') && f.includes('الإجمالي'));
+  let totalAmount = null;
+  if(totalField){
+    totalAmount = results.reduce((sum, r) => {
+      const n = parseAmountNumber(r.data && r.data[totalField]);
+      return sum + (n || 0);
+    }, 0);
+  }
+
+  summaryBar.style.display = 'flex';
+  summaryBar.innerHTML = `
+    <div class="stat-card"><span class="stat-num">${total}</span><span class="stat-label">إجمالي الملفات</span></div>
+    <div class="stat-card ${flaggedCount > 0 ? 'stat-danger' : ''}"><span class="stat-num">${flaggedCount}</span><span class="stat-label">🚩 فيها مؤشر اشتباه</span></div>
+    <div class="stat-card"><span class="stat-num">${invoiceCount}</span><span class="stat-label">فواتير</span></div>
+    <div class="stat-card"><span class="stat-num">${transferCount}</span><span class="stat-label">تحويلات بنكية</span></div>
+    ${totalAmount != null ? `<div class="stat-card"><span class="stat-num">${totalAmount.toLocaleString('ar')}</span><span class="stat-label">إجمالي المبالغ</span></div>` : ''}
+    ${errorCount > 0 ? `<div class="stat-card stat-danger"><span class="stat-num">${errorCount}</span><span class="stat-label">فشل الاستخراج</span></div>` : ''}
+  `;
+}
+
+function destroyCharts(){
+  [timelineChartInstance, vendorChartInstance, riskChartInstance, indicatorChartInstance]
+    .forEach(c => { if(c) c.destroy(); });
+  // إصلاح: كانت المراجع تبقى بعد destroy، فأي استدعاء لاحق يحاول تدمير رسوم ميتة.
+  timelineChartInstance = vendorChartInstance = riskChartInstance = indicatorChartInstance = null;
+}
+
+function renderDashboard(){
+  if(typeof Chart === 'undefined' || results.length === 0){
+    destroyCharts();
+    dashboardCard.style.display = 'none';
+    return;
+  }
+  dashboardCard.style.display = 'block';
+
+  destroyCharts();
+
+  const invoiceDateField = fieldNames.find(f => f.includes('تاريخ') && f.includes('الفاتورة'));
+  const transferDateField = fieldNames.find(f => f.includes('تاريخ') && f.includes('التحويل'));
+  const invoiceAmtField = fieldNames.find(f => f.includes('المبلغ') && f.includes('الإجمالي'));
+  const transferAmtField = fieldNames.find(f => f.includes('مبلغ') && f.includes('التحويل'));
+  const vendorField = fieldNames.find(f => f.includes('اسم') && f.includes('البائع'));
+
+  const dailyTotals = {};
+  results.forEach(r => {
+    if(!r.data) return;
+    const docType = r.data[DOC_TYPE_FIELD];
+    let dRaw = null, amt = null;
+    if(docType === 'فاتورة' && invoiceDateField){
+      dRaw = r.data[invoiceDateField];
+      amt = parseAmountNumber(r.data[invoiceAmtField]);
+    } else if(docType === 'تحويل بنكي' && transferDateField){
+      dRaw = r.data[transferDateField];
+      amt = parseAmountNumber(r.data[transferAmtField]);
+    }
+    const d = parseISODate(dRaw);
+    if(!d || amt == null) return;
+    const key = String(dRaw).slice(0,10);
+    dailyTotals[key] = (dailyTotals[key] || 0) + amt;
+  });
+  const sortedDates = Object.keys(dailyTotals).sort();
+  let maxDay = null, maxVal = -Infinity;
+  sortedDates.forEach(d => { if(dailyTotals[d] > maxVal){ maxVal = dailyTotals[d]; maxDay = d; } });
+
+  const timelineHighlight = document.getElementById('timelineHighlight');
+  if(maxDay){
+    timelineHighlight.textContent = `📌 أكثر يوم نشاطاً: ${maxDay} — بإجمالي ${maxVal.toLocaleString('ar')}`;
+    timelineHighlight.classList.remove('calm');
+  } else {
+    timelineHighlight.textContent = 'لا توجد بيانات تاريخ/مبلغ كافية لعرض الجدول الزمني';
+    timelineHighlight.classList.add('calm');
+  }
+
+  timelineChartInstance = new Chart(document.getElementById('timelineChart'), {
+    type: 'bar',
+    data: {
+      labels: sortedDates,
+      datasets: [{
+        label: 'إجمالي المبالغ',
+        data: sortedDates.map(d => dailyTotals[d]),
+        backgroundColor: sortedDates.map(d => d === maxDay ? '#c0392b' : '#146c5b'),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+
+  const vendorTotals = {};
+  if(vendorField){
+    results.forEach(r => {
+      if(!r.data) return;
+      const vendor = (r.data[vendorField] || '').trim();
+      if(!vendor) return;
+      const amt = parseAmountNumber(r.data[invoiceAmtField]) || 0;
+      vendorTotals[vendor] = (vendorTotals[vendor] || 0) + amt;
+    });
+  }
+  let vendorEntries = Object.entries(vendorTotals).sort((a,b) => b[1]-a[1]);
+  if(vendorEntries.length > 10){
+    const top10 = vendorEntries.slice(0,10);
+    const restSum = vendorEntries.slice(10).reduce((s,[,v]) => s+v, 0);
+    vendorEntries = [...top10, ['أخرى', restSum]];
+  }
+  const vendorPalette = ['#146c5b','#1a56db','#e8a33d','#8e44ad','#16a085','#2980b9','#d35400','#27ae60','#c0392b','#7f8c8d','#34495e'];
+  vendorChartInstance = new Chart(document.getElementById('vendorChart'), {
+    type: 'bar',
+    data: {
+      labels: vendorEntries.map(e => e[0]),
+      datasets: [{
+        label: 'إجمالي المبالغ',
+        data: vendorEntries.map(e => e[1]),
+        backgroundColor: vendorEntries.map((_,i) => vendorPalette[i % vendorPalette.length]),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true } }
+    }
+  });
+
+  const riskCounts = { 'طبيعي': 0, 'متوسط': 0, 'خطير': 0 };
+  const indicatorCounts = {};
+  results.forEach(r => {
+    const { level, triggered } = classifyRisk(r);
+    riskCounts[level]++;
+    triggered.forEach(k => {
+      const label = getIndicatorLabel(k);
+      indicatorCounts[label] = (indicatorCounts[label] || 0) + 1;
+    });
+  });
+
+  riskChartInstance = new Chart(document.getElementById('riskChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['🟢 طبيعي', '🟠 متوسط', '🔴 خطير'],
+      datasets: [{
+        data: [riskCounts['طبيعي'], riskCounts['متوسط'], riskCounts['خطير']],
+        backgroundColor: ['#1e8e5a', '#e8a33d', '#c0392b'],
+        borderWidth: 2, borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { font: { family: 'Cairo' } } } }
+    }
+  });
+
+  const indicatorEntries = Object.entries(indicatorCounts).sort((a,b) => b[1]-a[1]);
+  indicatorChartInstance = new Chart(document.getElementById('indicatorChart'), {
+    type: 'bar',
+    data: {
+      labels: indicatorEntries.map(e => e[0]),
+      datasets: [{
+        label: 'عدد الملفات',
+        data: indicatorEntries.map(e => e[1]),
+        backgroundColor: '#c0392b',
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+  });
+}
+
+refreshDashBtn.addEventListener('click', renderDashboard);
+
+// إصلاح أداء: كان الجدول كاملاً يُعاد بناؤه (مع كل الفحوص التقاطعية) مرتين لكل ملف —
+// أي O(n²) على مئات الملفات، مع فقد التركيز من أي خلية يحرّرها المستخدم أثناء المعالجة.
+let renderTimer = null;
+let lastRenderAt = 0;
+const RENDER_MIN_GAP = 250;
+
+function requestRender(force){
+  if(force){
+    if(renderTimer){ clearTimeout(renderTimer); renderTimer = null; }
+    lastRenderAt = Date.now();
+    renderTable();
+    return;
+  }
+  if(renderTimer) return;
+  const wait = Math.max(0, RENDER_MIN_GAP - (Date.now() - lastRenderAt));
+  renderTimer = setTimeout(()=>{
+    renderTimer = null;
+    // لا تسحب التركيز من خلية يحرّرها المستخدم الآن — أعد الجدولة بدل إعادة البناء.
+    if(document.activeElement && document.activeElement.isContentEditable){
+      lastRenderAt = Date.now();
+      requestRender();
+      return;
+    }
+    lastRenderAt = Date.now();
+    renderTable();
+  }, wait);
+}
+
+function renderTable(){
+  if(results.length === 0){
+    resultsWrap.innerHTML = '<div class="empty">لا توجد نتائج بعد</div>';
+    exportBtn.disabled = true;
+    aiOverviewBtn.disabled = true;
+    summaryBar.style.display = 'none';
+    return;
+  }
+  runCrossChecks();
+  renderSummaryBar();
+
+  let html = '<table><thead><tr><th>اسم الملف</th><th>نوع المستند</th><th class="verdict-col">⚖️ الخلاصة النهائية</th>';
+  fieldNames.forEach(f => html += `<th>${escapeHtml(f)}</th>`);
+  html += `<th>${MATH_CHECK_FIELD}</th><th>${MATH_RATE_CHECK}</th><th>${STAMP_MATCH_CHECK}</th><th>${CROSS_PHONE_FIELD}</th><th>${CROSS_SEQ_FIELD}</th><th>${DUP_INVOICE_FIELD}</th><th>${DUP_FILE_FIELD}</th><th>${SPLIT_FIELD}</th><th>${YEAR_CHECK_FIELD}</th>`;
+  html += '<th>الحالة</th></tr></thead><tbody>';
+
+  results.forEach((r, idx) => {
+    const docType = r.data && r.data[DOC_TYPE_FIELD];
+    html += `<tr><td>${escapeHtml(r.fileName)}<br><button class="btn-outline preview-btn" data-idx="${idx}">👁 عرض الملف</button></td><td>${docBadgeHtml(docType)}</td>`;
+    html += `<td class="verdict-col">${computedBadgeHtml(r.data && r.data[VERDICT_FIELD])}</td>`;
+
+    fieldNames.forEach(f => {
+      const val = r.data && r.data[f] != null ? r.data[f] : '';
+      if(FLAG_FIELDS.includes(f)){
+        html += `<td data-idx="${idx}" data-field="${escapeHtml(f)}">${flagCellHtml(val)}</td>`;
+      } else {
+        html += `<td contenteditable="true" data-idx="${idx}" data-field="${escapeHtml(f)}">${escapeHtml(val)}</td>`;
+      }
+    });
+
+    html += `<td>${computedBadgeHtml(r.data && r.data[MATH_CHECK_FIELD])}</td>`;
+    html += `<td>${computedBadgeHtml(r.data && r.data[MATH_RATE_CHECK])}</td>`;
+    html += `<td>${computedBadgeHtml(r.data && r.data[STAMP_MATCH_CHECK])}</td>`;
+    html += `<td>${computedBadgeHtml(r.data && r.data[CROSS_PHONE_FIELD])}</td>`;
+    html += `<td>${computedBadgeHtml(r.data && r.data[CROSS_SEQ_FIELD])}</td>`;
+    html += `<td>${computedBadgeHtml(r.data && r.data[DUP_INVOICE_FIELD])}</td>`;
+    html += `<td>${computedBadgeHtml(r.data && r.data[DUP_FILE_FIELD])}</td>`;
+    html += `<td>${computedBadgeHtml(r.data && r.data[SPLIT_FIELD])}</td>`;
+    html += `<td>${computedBadgeHtml(r.data && r.data[YEAR_CHECK_FIELD])}</td>`;
+
+    if(r.processing){
+      html += `<td>⏳ جارٍ المعالجة...</td>`;
+    } else if(r.error){
+      html += `<td class="status-err">فشل ⚠️<br><span style="font-weight:400;font-size:11px;">${escapeHtml(r.error)}</span><br>
+        <button class="btn-outline retry-btn" data-idx="${idx}" style="padding:4px 10px;font-size:12px;margin-top:6px;">🔄 إعادة المحاولة</button></td>`;
+    } else if(r.data){
+      html += `<td class="status-ok">تم ✓<br>
+        <button class="btn-outline retry-btn" data-idx="${idx}" style="padding:4px 10px;font-size:12px;margin-top:6px;">🔄 إعادة</button></td>`;
+    } else {
+      html += `<td>في الانتظار ⏳</td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  resultsWrap.innerHTML = html;
+  exportBtn.disabled = false;
+  aiOverviewBtn.disabled = false;
+
+  // تحسين: إعادة تشغيل التحقق عند تعديل البيانات يدوياً للخروج Blur
+  // إصلاح: كانت تُعاد بناء الجدول بالكامل عند كل خروج من خلية حتى لو لم تتغيّر القيمة.
+  resultsWrap.querySelectorAll('td[contenteditable=true]').forEach(td => {
+    td.addEventListener('blur', (e)=>{
+      const idx = Number(e.target.dataset.idx);
+      const field = e.target.dataset.field;
+      const row = results[idx];
+      if(!row) return;
+      if(!row.data) row.data = {};
+      const newVal = e.target.innerText.trim();
+      if(String(row.data[field] == null ? '' : row.data[field]) === newVal) return;
+      row.data[field] = newVal;
+      renderTable();
+    });
+  });
+
+  resultsWrap.querySelectorAll('.retry-btn').forEach(btn => {
+    btn.addEventListener('click', ()=> retrySingleFile(parseInt(btn.dataset.idx)));
+  });
+
+  resultsWrap.querySelectorAll('.preview-btn').forEach(btn => {
+    btn.addEventListener('click', ()=>{
+      const idx = parseInt(btn.dataset.idx);
+      const r = results[idx];
+      if(r && r.file) openPreview(r.file);
+    });
+  });
+}
+
+async function retrySingleFile(idx){
+  const key = apiKeyInput.value.trim();
+  if(!key){ alert('الرجاء إدخال مفتاح OpenRouter API أولاً.'); return; }
+  const r = results[idx];
+  if(!r || !r.file) return;
+
+  r.processing = true;
+  r.error = null;
+  renderTable();
+
+  try{
+    const data = await extractFromFile(r.file, fieldNames, null);
+    const hash = await computeFileHash(r.file);
+    results[idx] = { fileName: r.fileName, file: r.file, processing: false, data, error: null, hash };
+  }catch(err){
+    const hash = r.hash || await computeFileHash(r.file).catch(() => null);
+    results[idx] = { fileName: r.fileName, file: r.file, processing: false, data: r.data || {}, error: err.name === 'AbortError' ? 'تم إلغاء الطلب' : err.message, hash };
+  }
+  renderTable();
+  renderDashboard();
+}
+
+let isCancelled = false;
+let isPaused = false;
+let pauseResolvers = [];
+let activeControllers = new Set();
+let nextIndex = 0;
+let completedCount = 0;
+
+function waitIfPaused(){
+  if(!isPaused) return Promise.resolve();
+  return new Promise(resolve => pauseResolvers.push(resolve));
+}
+
+function resumeFromPause(){
+  isPaused = false;
+  pauseBtn.textContent = '⏸ إيقاف مؤقت';
+  pauseResolvers.forEach(r => r());
+  pauseResolvers = [];
+}
+
+runBtn.addEventListener('click', async ()=>{
+  const key = apiKeyInput.value.trim();
+  if(!key){ alert('الرجاء إدخال مفتاح OpenRouter API أولاً.'); return; }
+  if(!modelNameInput.value.trim()){ alert('الرجاء إدخال اسم الموديل (model slug).'); return; }
+  if(selectedFiles.length === 0){ alert('الرجاء اختيار مجلد يحتوي ملفات مدعومة.'); return; }
+
+  // إصلاح: كان الفصل بالفاصلة اللاتينية فقط — الفاصلة العربية "،" أو سطر جديد كانت تدمج الحقول في حقل واحد.
+  // وأُضيف حذف التكرار لتفادي أعمدة مكرّرة تُفسد الجدول والتصدير.
+  fieldNames = [...new Set(
+    fieldsInput.value
+      .split(/[,،\n;؛]/)
+      .map(s => s.trim())
+      .filter(f => Boolean(f) && f !== DOC_TYPE_FIELD && f !== VERDICT_FIELD)
+  )];
+  if(fieldNames.length === 0){ alert('الرجاء إدخال حقل واحد على الأقل.'); return; }
+
+  const concurrency = parseInt(document.getElementById('concurrencySelect').value, 10) || 3;
+
+  results = selectedFiles.map(f => ({
+    fileName: f.name,
+    file: f,
+    processing: false,
+    data: null,
+    error: null,
+    hash: null
+  }));
+
+  isCancelled = false;
+  isPaused = false;
+  pauseResolvers = [];
+  activeControllers.clear();
+  nextIndex = 0;
+  completedCount = 0;
+
+  dashboardCard.style.display = 'none';
+  runBtn.disabled = true;
+  runBtn.style.display = 'none';
+  pauseBtn.style.display = 'inline-block';
+  pauseBtn.textContent = '⏸ إيقاف مؤقت';
+  stopBtn.style.display = 'inline-block';
+  stopBtn.disabled = false;
+  stopBtn.textContent = '⏹ إيقاف العملية';
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '0%';
+  progressCount.textContent = `0/${selectedFiles.length}`;
+  progressLabel.textContent = 'جارٍ معالجة الملفات...';
+
+  renderTable();
+
+  const workerCount = Math.min(concurrency, selectedFiles.length);
+  const workers = [];
+
+  for(let w = 0; w < workerCount; w++){
+    workers.push((async () => {
+      while(nextIndex < selectedFiles.length && !isCancelled){
+        await waitIfPaused();
+        if(isCancelled) break;
+
+        const i = nextIndex++;
+        if(i >= selectedFiles.length) break;
+
+        const file = selectedFiles[i];
+        results[i].processing = true;
+        requestRender();
+
+        const controller = new AbortController();
+        activeControllers.add(controller);
+
+        // إصلاح: عند الإيقاف كانت النتيجة لا تُكتب إطلاقاً، فتبقى الصفوف عالقة على
+        // "⏳ جارٍ المعالجة..." إلى الأبد. الآن تُكتب الحالة دائماً.
+        try{
+          const data = await extractFromFile(file, fieldNames, controller.signal);
+          const hash = await computeFileHash(file);
+          results[i] = { fileName: file.name, file, processing: false, data, error: null, hash };
+        }catch(err){
+          const hash = await computeFileHash(file).catch(() => null);
+          results[i] = {
+            fileName: file.name,
+            file,
+            processing: false,
+            data: results[i].data || {},
+            error: (err.name === 'AbortError' || isCancelled) ? 'تم إلغاء الطلب' : err.message,
+            hash
+          };
+        }finally{
+          activeControllers.delete(controller);
+        }
+
+        completedCount++;
+        progressBar.style.width = `${Math.round((completedCount / selectedFiles.length) * 100)}%`;
+        progressCount.textContent = `${completedCount}/${selectedFiles.length}`;
+        progressLabel.textContent = isPaused ? 'موقوف مؤقتاً' : `تمت معالجة ${completedCount} من أصل ${selectedFiles.length}`;
+        requestRender();
+      }
+    })());
+  }
+
+  await Promise.all(workers);
+
+  // تنظيف أي صف بقي معلّقاً (إيقاف أثناء التنفيذ)
+  results.forEach(r => {
+    if(r.processing){
+      r.processing = false;
+      if(!r.error && !r.data) r.error = 'لم تتم معالجته (تم إيقاف العملية)';
+    }
+  });
+  requestRender(true);
+
+  if(!isCancelled){
+    progressBar.style.width = '100%';
+    progressLabel.textContent = 'اكتملت المعالجة بنجاح';
+    renderDashboard();
+  } else {
+    progressLabel.textContent = `تم إيقاف العملية (تمت معالجة ${completedCount} ملف)`;
+  }
+
+  runBtn.disabled = false;
+  runBtn.style.display = 'inline-block';
+  pauseBtn.style.display = 'none';
+  stopBtn.style.display = 'none';
+});
+
+pauseBtn.addEventListener('click', ()=>{
+  if(!isPaused){
+    isPaused = true;
+    pauseBtn.textContent = '▶ استكمال';
+    progressLabel.textContent = '⏸ متوقف مؤقتاً (اضغط استكمال للمتابعة)';
+  } else {
+    resumeFromPause();
+  }
+});
+
+stopBtn.addEventListener('click', ()=>{
+  isCancelled = true;
+  if(isPaused) resumeFromPause();
+  activeControllers.forEach(c => c.abort());
+  activeControllers.clear();
+  stopBtn.disabled = true;
+  stopBtn.textContent = '⏳ جارٍ الإيقاف...';
+});
+
+function simpleMarkdownToHtml(md){
+  let escaped = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const lines = escaped.split('\n');
+  let html = '';
+  let inList = false;
+  lines.forEach(line => {
+    const l = line.trim();
+    if(/^###\s+/.test(l)){
+      if(inList){ html += '</ul>'; inList = false; }
+      html += `<h4>${l.replace(/^###\s+/, '')}</h4>`;
+    } else if(/^##\s+/.test(l)){
+      if(inList){ html += '</ul>'; inList = false; }
+      html += `<h3>${l.replace(/^##\s+/, '')}</h3>`;
+    } else if(/^#\s+/.test(l)){
+      if(inList){ html += '</ul>'; inList = false; }
+      html += `<h2>${l.replace(/^#\s+/, '')}</h2>`;
+    } else if(/^[-*]\s+/.test(l)){
+      if(!inList){ html += '<ul>'; inList = true; }
+      html += `<li>${l.replace(/^[-*]\s+/, '')}</li>`;
+    } else if(l === ''){
+      if(inList){ html += '</ul>'; inList = false; }
+    } else {
+      if(inList){ html += '</ul>'; inList = false; }
+      html += `<p>${l}</p>`;
+    }
+  });
+  if(inList) html += '</ul>';
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  return html;
+}
+
+// توفير توكنز بلا فقد معلومات: حذف المفاتيح الفارغة بدل إرسال "": "" لكل حقل ناقص في كل صف.
+// وعند الجداول الضخمة يُكتفى بالأعمدة الجوهرية حتى لا يتجاوز الطلب حدود سياق النموذج ويفشل.
+const SNAPSHOT_SOFT_LIMIT = 120000; // بالأحرف
+
+function buildTableSnapshot(){
+  const indicatorKeys = getIndicatorKeys();
+
+  const full = results.map(r => {
+    const row = { 'اسم الملف': r.fileName, 'نوع المستند': (r.data && r.data[DOC_TYPE_FIELD]) || '' };
+    fieldNames.forEach(f => { row[f] = (r.data && r.data[f] != null) ? r.data[f] : ''; });
+    row[VERDICT_FIELD] = (r.data && r.data[VERDICT_FIELD]) || '';
+    indicatorKeys.forEach(k => { row[k] = (r.data && r.data[k]) || ''; });
+    Object.keys(row).forEach(k => { if(row[k] === '' || row[k] == null) delete row[k]; });
+    return row;
+  });
+
+  if(JSON.stringify(full).length <= SNAPSHOT_SOFT_LIMIT) return full;
+
+  // نسخة مضغوطة: الحقول التحليلية الأساسية + المؤشرات المُفعّلة فقط
+  const core = fieldNames.filter(f =>
+    f.includes('البائع') || f.includes('تاريخ') || f.includes('المبلغ') || f.includes('مبلغ') || f.includes('رقم')
+  );
+  return results.map(r => {
+    const row = { 'اسم الملف': r.fileName, 'نوع المستند': (r.data && r.data[DOC_TYPE_FIELD]) || '' };
+    core.forEach(f => { row[f] = (r.data && r.data[f] != null) ? r.data[f] : ''; });
+    indicatorKeys.forEach(k => { if(isBadForField(k, r.data && r.data[k])) row[k] = r.data[k]; });
+    Object.keys(row).forEach(k => { if(row[k] === '' || row[k] == null) delete row[k]; });
+    return row;
+  });
+}
+
+async function runAIOverview(){
+  const key = apiKeyInput.value.trim();
+  if(!key){ alert('الرجاء إدخال مفتاح OpenRouter API أولاً.'); return; }
+  if(results.length === 0) return;
+
+  aiReportModal.style.display = 'flex';
+  aiReportBody.innerHTML = `<div class="report-loading"><div class="spinner"></div>جارٍ تحليل الجدول بالكامل...</div>`;
+
+  const snapshot = buildTableSnapshot();
+  const model = modelNameInput.value.trim();
+
+  const prompt = `أنت محلل مالي خبير في مراجعة الفواتير والتحويلات البنكية واكتشاف التلاعب.
+سأعطيك بيانات مستخرجة مسبقاً من مجموعة فواتير/تحويلات بصيغة JSON.
+
+مهمتك كتابة تقرير عربي بصيغة Markdown يتضمن
+الأقسام التالية:
+## نظرة عامة سريعة
+## تشابهات محتملة في أسماء البائعين
+## قيم مالية شاذة إحصائياً
+## أولويات المراجعة اليدوية
+## تنبيه على الحدود
+
+البيانات:
+${JSON.stringify(snapshot)}`;
+
+  try{
+    const response = await fetchWithRetry("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${key}`
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 3000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    if(!response.ok){
+      const errTxt = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errTxt.slice(0,200)}`);
+    }
+
+    const data = await response.json();
+    if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+
+    const msg = data.choices && data.choices[0] && data.choices[0].message;
+    let text = '';
+    if(msg){
+      if(typeof msg.content === 'string') text = msg.content;
+      else if(Array.isArray(msg.content)) text = msg.content.map(p => (typeof p === 'string' ? p : (p.text || ''))).join('\n');
+    }
+    if(!text.trim()) throw new Error('لم يُرجع الموديل نصاً');
+
+    aiReportBody.innerHTML = simpleMarkdownToHtml(text);
+  }catch(err){
+    aiReportBody.innerHTML = `<div class="report-error">⚠️ تعذّر إنشاء التقرير:<br>${err.message}</div>`;
+  }
+}
+
+aiOverviewBtn.addEventListener('click', runAIOverview);
+aiReportCloseBtn.addEventListener('click', ()=>{ aiReportModal.style.display = 'none'; });
+aiReportModal.addEventListener('click', (e)=>{ if(e.target === aiReportModal) aiReportModal.style.display = 'none'; });
+
+exportBtn.addEventListener('click', ()=>{
+  runCrossChecks();
+  const rows = results.map(r => {
+    const row = { 'اسم الملف': r.fileName, 'نوع المستند': (r.data && r.data[DOC_TYPE_FIELD]) || '', [VERDICT_FIELD]: (r.data && r.data[VERDICT_FIELD]) || '' };
+    fieldNames.forEach(f => {
+      const raw = (r.data && r.data[f] != null) ? r.data[f] : '';
+      if(f.includes('تاريخ')){
+        const d = parseISODate(raw);
+        row[f] = d ? d : raw;
+      } else if(isAmountField(f)){
+        const n = parseAmountNumber(raw);
+        row[f] = (n != null) ? n : raw;
+      } else {
+        row[f] = raw;
+      }
+    });
+    row[MATH_CHECK_FIELD] = (r.data && r.data[MATH_CHECK_FIELD]) || '';
+    row[MATH_RATE_CHECK] = (r.data && r.data[MATH_RATE_CHECK]) || '';
+    row[STAMP_MATCH_CHECK] = (r.data && r.data[STAMP_MATCH_CHECK]) || '';
+    row[CROSS_PHONE_FIELD] = (r.data && r.data[CROSS_PHONE_FIELD]) || '';
+    row[CROSS_SEQ_FIELD] = (r.data && r.data[CROSS_SEQ_FIELD]) || '';
+    row[DUP_INVOICE_FIELD] = (r.data && r.data[DUP_INVOICE_FIELD]) || '';
+    row[DUP_FILE_FIELD] = (r.data && r.data[DUP_FILE_FIELD]) || '';
+    row[SPLIT_FIELD] = (r.data && r.data[SPLIT_FIELD]) || '';
+    row[YEAR_CHECK_FIELD] = (r.data && r.data[YEAR_CHECK_FIELD]) || '';
+    row['الحالة'] = r.error ? `فشل: ${r.error}` : 'تم';
+    return row;
+  });
+  const ws = XLSX.utils.json_to_sheet(rows, { cellDates: true });
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for(let c = range.s.c; c <= range.e.c; c++){
+    for(let rIdx = range.s.r + 1; rIdx <= range.e.r; rIdx++){
+      const cellRef = XLSX.utils.encode_cell({ r: rIdx, c });
+      const cell = ws[cellRef];
+      if(cell && cell.v instanceof Date){
+        cell.t = 'd';
+        cell.z = 'yyyy-mm-dd';
+      }
+    }
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'النتائج');
+  XLSX.writeFile(wb, 'بيانات_مستخرجة.xlsx');
+});
+</script>
+</body>
+</html>
