@@ -1041,7 +1041,13 @@ function extractInvoiceNum(str){
   return m ? parseInt(m[1], 10) : null;
 }
 
-function clusterByDateProximity(items, maxGapDays){
+/* عتبة "احتمال تقسيم فاتورة": كانت فاتورتين من نفس البائع خلال 3 أيام — وهو نمط
+   شائع جداً في التعاملات العادية، فكان يُعلّم معظم الجدول ويُغرق المؤشرات الحقيقية.
+   رُفعت إلى ثلاث فواتير: تقسيم مبلغ على دفعتين قد يكون صدفة، أما ثلاث فأقرب للنمط. */
+const SPLIT_MIN_INVOICES = 3;
+const SPLIT_WINDOW_DAYS = 3;
+
+function clusterByDateProximity(items, maxGapDays, minSize = 2){
   const sorted = [...items].sort((a,b) => a.date - b.date);
   const clusters = [];
   let current = [];
@@ -1052,11 +1058,11 @@ function clusterByDateProximity(items, maxGapDays){
     if(gapDays <= maxGapDays){
       current.push(sorted[i]);
     } else {
-      if(current.length > 1) clusters.push(current);
+      if(current.length >= minSize) clusters.push(current);
       current = [sorted[i]];
     }
   }
-  if(current.length > 1) clusters.push(current);
+  if(current.length >= minSize) clusters.push(current);
   return clusters;
 }
 
@@ -1239,7 +1245,7 @@ function runCrossChecks(){
       groups[vendor].push({ idx, date, amt: amt || 0, fileName: r.fileName });
     });
     Object.entries(groups).forEach(([vendor, items]) => {
-      const clusters = clusterByDateProximity(items, 3);
+      const clusters = clusterByDateProximity(items, SPLIT_WINDOW_DAYS, SPLIT_MIN_INVOICES);
       clusters.forEach(cluster => {
         const sum = cluster.reduce((s,x) => s + x.amt, 0);
         const spanDays = Math.round(Math.abs((cluster[cluster.length-1].date - cluster[0].date) / 86400000));
